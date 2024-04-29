@@ -1,6 +1,6 @@
 # Setting up a pre-commit hook to run Ruff linter
 
-## Requirement
+## Requirements
 
 - Python - latest version
 - Pip installed
