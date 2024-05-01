@@ -1,3 +1,4 @@
+test
 # Setting up a pre-commit hook to run Ruff linter
 
 ## Requirement
