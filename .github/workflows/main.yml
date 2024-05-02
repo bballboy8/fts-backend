@@ -22,13 +22,13 @@ jobs:
         ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'cd /home/ubuntu/fts-backend && git pull origin production || (echo "Error encountered during git pull. Stashing changes before retrying." && git stash && git pull origin production)'
         
     - name: Install dependencies
-      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'cd /home/ubuntu/fts-backend && docker stop $(docker ps -aq) && docker rm $(docker ps -aq)'
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'cd /home/ubuntu/fts-backend && sudo docker stop $(docker ps -aq) && sudo docker rm $(docker ps -aq)'
 
     - name: Build
-      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'cd /home/ubuntu/fts-backend && docker build -t project .'
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'cd /home/ubuntu/fts-backend && sudo docker build -t project .'
 
     - name: Run Docker
-      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'docker run -d -p 8000:8000 project'
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'sudo docker run -d -p 8000:8000 project'
     
     - name: Run logs Docker
-      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'docker ps -q | xargs docker logs'
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'sudo docker ps -q | xargs docker logs'
