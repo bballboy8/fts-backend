@@ -20,3 +20,15 @@ jobs:
     - name: Change directory and pull repository
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'cd /home/ubuntu/fts-backend && git pull origin production || (echo "Error encountered during git pull. Stashing changes before retrying." && git stash && git pull origin production)'
+        
+    - name: Install dependencies
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'cd /home/ubuntu/fts-backend && docker stop $(docker ps -aq) && docker rm $(docker ps -aq)'
+
+    - name: Build
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'cd /home/ubuntu/fts-backend && docker build -t project .'
+
+    - name: Run Docker
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'docker run -d -p 8000:8000 project'
+    
+    - name: Run logs Docker
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'docker ps -q | xargs docker logs'
