@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+boto3
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
