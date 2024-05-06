@@ -16,3 +16,29 @@ def get_dynamodb_resource():
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key
     )
+
+
+def create_dynamodb_tables():
+    dynamodb = get_dynamodb_resource()
+
+    # Users table
+    user_table = dynamodb.create_table(
+        TableName='Users',
+        KeySchema=[{'AttributeName': 'username', 'KeyType': 'HASH'}],
+        AttributeDefinitions=[{'AttributeName': 'username', 'AttributeType': 'S'}],
+        ProvisionedThroughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
+    )
+
+    # User Settings table
+    user_settings_table = dynamodb.create_table(
+        TableName='UserSettings',
+        KeySchema=[{'AttributeName': 'username', 'KeyType': 'HASH'}],
+        AttributeDefinitions=[{'AttributeName': 'username', 'AttributeType': 'S'}],
+        ProvisionedThroughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
+    )
+
+    user_table.wait_until_exists()
+    user_settings_table.wait_until_exists()
+
+if __name__ == "__main__":
+    create_dynamodb_tables()
