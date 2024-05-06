@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
 from app.models.user import save_user, get_user, update_user_settings
-from app.schemas.user import UserIn, UserSettings
+from app.schemas.user import UserIn, UserSettings, UserLogin
 
 router = APIRouter(
     prefix="/user",
@@ -21,11 +21,11 @@ async def signup(user_in: UserIn):
     return {"username": user_in.username, "email": user_in.email}
 
 @router.post("/login/")
-async def login(username: str, password: str):
-    user = get_user(username)
-    if not user or not verify_password(password, user['hashed_password']):
+async def login(user_login: UserLogin):
+    user = get_user(user_login.username)
+    if not user or not verify_password(user_login.password, user['hashed_password']):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
-    access_token = create_access_token(data={"sub": username})
+    access_token = create_access_token(data={"sub": user_login.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/settings/")

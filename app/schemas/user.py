@@ -13,3 +13,7 @@ class UserIn(BaseModel):
 class UserSettings(BaseModel):
     username: str
     settings: Dict
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
