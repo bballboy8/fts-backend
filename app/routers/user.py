@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
 from app.models.user import save_user, get_user, update_user_settings
-from app.schemas.user import UserIn, UserSettings, UserLogin
+from app.schemas.user import UserSignUp, UserSettings, UserLogin
 
 router = APIRouter(
     prefix="/user",
@@ -10,7 +10,7 @@ router = APIRouter(
 )
 
 @router.post("/signup/")
-async def signup(user_in: UserIn):
+async def signup(user_in: UserSignUp):
     hashed_password = get_password_hash(user_in.password)
     user_data = {
         "username": user_in.username,
