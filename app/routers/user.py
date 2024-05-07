@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
-from app.models.user import save_user, get_user, update_user_settings
-from app.schemas.user import UserSignUp, UserSettings, UserLogin
+from app.models.user import save_user, get_user, update_user_settings, get_user_settings
+from app.schemas.user import UserSignUp, UserSettings, UserLogin, UpdateUserSettingsRequest
 
 router = APIRouter(
     prefix="/user",
@@ -29,6 +29,6 @@ async def login(user_login: UserLogin):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/settings/")
-async def update_settings(settings: UserSettings):
-    update_user_settings(settings.username, settings.settings)
-    return {"message": "Settings updated"}
+async def update_settings(request: UpdateUserSettingsRequest):
+    update_user_settings(request.username, request.settings)
+    return {"message": "User settings updated"}

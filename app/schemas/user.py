@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Dict
 
 class User(BaseModel):
@@ -11,8 +11,13 @@ class UserSignUp(BaseModel):
     password: str
 
 class UserSettings(BaseModel):
+    theme: Optional[str] = Field("light", description="Theme preference: light or dark")
+    notifications: bool = Field(True, description="Enable or disable notifications")
+    language: Optional[str] = Field("en", description="Preferred language for UI")
+
+class UpdateUserSettingsRequest(BaseModel):
     username: str
-    settings: Dict
+    settings: UserSettings
 
 class UserLogin(BaseModel):
     username: str
