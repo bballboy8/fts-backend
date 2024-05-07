@@ -1,7 +1,10 @@
-# main.py
 from fastapi import FastAPI
-from .routes.example_route import router as example_router
+from app.routers import user
 
 app = FastAPI()
 
-app.include_router(example_router)
+app.include_router(user.router)
+
+@app.get("/")
+async def read_root():
+    return {"message": "Welcome to FastAPI-DynamoDB Application!"}
