@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
 from app.models.user import save_user, get_user, update_user_settings, get_user_settings
-from app.schemas.user import UserSignUp, UserSettings, UserLogin, UpdateUserSettingsRequest
+from app.schemas.user import UserSignUp, UserLogin, UpdateUserSettingsRequest
 
 router = APIRouter(
     prefix="/user",
@@ -31,4 +31,11 @@ async def login(user_login: UserLogin):
 @router.post("/settings/")
 async def update_settings(request: UpdateUserSettingsRequest):
     update_user_settings(request.username, request.settings)
-    return {"message": "User settings updated"}
+    
+    # Retrieve updated settings from DynamoDB
+    updated_settings = get_user_settings(request.username)
+
+    if updated_settings:
+        return updated_settings
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
