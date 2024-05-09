@@ -1,7 +1,8 @@
-from app.services.dynamodb_service import get_dynamodb_resource
+from app.services.dynamodb_service import DynamoDBService
 # from app.schemas.user import UserSettingsFields
 
-dynamodb = get_dynamodb_resource()
+dynamodb = DynamoDBService.get_resource()
+
 user_table = dynamodb.Table('Users')
 user_settings_table = dynamodb.Table('UserSettings')
 

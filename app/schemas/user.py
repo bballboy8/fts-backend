@@ -22,3 +22,7 @@ class UpdateUserSettingsRequest(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+    
+
+class UserLogout(BaseModel):
+    username: str
