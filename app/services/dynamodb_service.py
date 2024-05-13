@@ -1,6 +1,7 @@
 import boto3
 from dotenv import load_dotenv
 import os
+from botocore.config import Config
 
 # create a logging instance
 import logging
@@ -16,6 +17,7 @@ class DynamoDBService:
     @classmethod
     def get_resource(cls):
         if cls._resource is None:
+            config = Config(connect_timeout=5, read_timeout=5, retries={'max_attempts': 5})
             aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
             aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
             aws_region = os.getenv('AWS_REGION')
@@ -26,7 +28,8 @@ class DynamoDBService:
                     'dynamodb',
                     region_name=aws_region,
                     aws_access_key_id=aws_access_key_id,
-                    aws_secret_access_key=aws_secret_access_key
+                    aws_secret_access_key=aws_secret_access_key,
+                    config=config
                 )
                 logging.info("DynamoDB resource created successfully")  
             except Exception as e:
