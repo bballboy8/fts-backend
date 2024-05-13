@@ -1,3 +1,4 @@
+from http.client import HTTPException
 from app.services.dynamodb_service import DynamoDBService
 # from app.schemas.user import UserSettingsFields
 
@@ -16,12 +17,18 @@ def save_user(user_data):
     
     
 def check_user_exists(username):
-    response = user_table.get_item(Key={'username': username})
+    try:
+        response = user_table.get_item(Key={'username': username})
+    except Exception as e:
+        return HTTPException(status_code=500, detail=str(e))
     return response.get('Item') is not None
 
 
 def get_user(username):
-    response = user_table.get_item(Key={'username': username})
+    try:
+        response = user_table.get_item(Key={'username': username})
+    except Exception as e:
+        return HTTPException(status_code=500, detail=str(e))
     return response.get('Item')
 
 
