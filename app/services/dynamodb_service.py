@@ -36,52 +36,6 @@ class DynamoDBService:
                 logging.error(f"Error creating DynamoDB resource: {str(e)}")
         return cls._resource
 
-# def get_dynamodb_resource():
-#     aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
-#     aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-#     aws_region = os.getenv('AWS_REGION')
-
-#     return boto3.resource(
-#         'dynamodb',
-#         region_name=aws_region,
-#         aws_access_key_id=aws_access_key_id,
-#         aws_secret_access_key=aws_secret_access_key
-#     )
-
-
-# def create_dynamodb_tables():
-#     dynamodb = get_dynamodb_resource()
-#     print("Creating tables...")
-    
-#     # check if the tables already exist
-#     existing_tables = dynamodb.tables.all()
-#     for table in existing_tables:
-#         if table.name == 'Users' or table.name == 'UserSettings':
-#             print(f"Table {table.name} already exists")
-#             return
-
-#     # Users table
-#     user_table = dynamodb.create_table(
-#         TableName='Users',
-#         KeySchema=[{'AttributeName': 'username', 'KeyType': 'HASH'}],
-#         AttributeDefinitions=[{'AttributeName': 'username', 'AttributeType': 'S'}],
-#         ProvisionedThroughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
-#     )
-
-#     # User Settings table
-#     user_settings_table = dynamodb.create_table(
-#         TableName='UserSettings',
-#         KeySchema=[{'AttributeName': 'username', 'KeyType': 'HASH'}],
-#         AttributeDefinitions=[{'AttributeName': 'username', 'AttributeType': 'S'}],
-#         ProvisionedThroughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
-#     )
-
-#     user_table.wait_until_exists()
-#     user_settings_table.wait_until_exists()
-
-# if __name__ == "__main__":
-#     create_dynamodb_tables()
-
 def create_dynamodb_tables():
     dynamodb = DynamoDBService.get_resource()
 
