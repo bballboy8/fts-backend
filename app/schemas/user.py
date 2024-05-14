@@ -1,16 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, validator
-from typing import Optional, List
-
-class User(BaseModel):
-    """
-    User schema representing basic user details.
-
-    Attributes:
-        username (str): The username of the user.
-        email (EmailStr): The email address of the user.
-    """
-    username: str
-    email: EmailStr
+from typing import Optional
 
 class TradingExperience(BaseModel):
     """
@@ -116,10 +105,10 @@ class UpdateUserSettingsRequest(BaseModel):
     UpdateUserSettingsRequest schema representing a request to update user settings.
 
     Attributes:
-        username (str): The username of the user.
+        email (str): The username of the user.
         settings (UserSettings): The user's updated settings.
     """
-    username: str
+    email: str
     settings: UserSettings
 
 class UserLogin(BaseModel):
@@ -127,10 +116,10 @@ class UserLogin(BaseModel):
     UserLogin schema representing a user's login credentials.
 
     Attributes:
-        username (str): The username of the user.
+        email (str): The username of the user.
         password (str): The user's password.
     """
-    username: str
+    email: str
     password: str
 
 class UserLogout(BaseModel):
@@ -138,6 +127,6 @@ class UserLogout(BaseModel):
     UserLogout schema representing a user's logout request.
 
     Attributes:
-        username (str): The username of the user.
+        email (str): The username of the user.
     """
-    username: str
+    email: str
