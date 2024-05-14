@@ -1,6 +1,10 @@
 from http.client import HTTPException
 from app.services.dynamodb_service import DynamoDBService
-# from app.schemas.user import UserSettingsFields
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 dynamodb = DynamoDBService.get_resource()
 
@@ -19,7 +23,9 @@ def save_user(user_data):
 def check_user_exists(username):
     try:
         response = user_table.get_item(Key={'username': username})
+        logger.info('User exists and found in the database')
     except Exception as e:
+        logger.error(f"Error checking if user exists: {e}")
         return HTTPException(status_code=500, detail=str(e))
     return response.get('Item') is not None
 
@@ -27,7 +33,9 @@ def check_user_exists(username):
 def get_user(username):
     try:
         response = user_table.get_item(Key={'username': username})
+        logger.info('User exists and found in the database')
     except Exception as e:
+        logger.error(f"Error checking if user exists: {e}")
         return HTTPException(status_code=500, detail=str(e))
     return response.get('Item')
 
@@ -53,5 +61,12 @@ def update_user_settings(username, settings):
     )
 
 def get_user_settings(username):
-    response = user_settings_table.get_item(Key={'username': username})
+        
+    try:
+        response = user_settings_table.get_item(Key={'username': username})
+        logger.info('User settings found in the database')
+    except Exception as e:
+        logger.error(f"Error getting user settings: {e}")
+        return HTTPException(status_code=500, detail=str(e))
+    
     return response.get('Item')

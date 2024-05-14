@@ -4,6 +4,11 @@ from app.auth.authentication import create_access_token
 from app.models.user import save_user, get_user, update_user_settings, get_user_settings
 from app.schemas.user import UserSignUp, UserSettings, UserLogin, UpdateUserSettingsRequest, UserLogout
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 router = APIRouter(
     prefix="/user",
     tags=["user"]
@@ -32,8 +37,8 @@ async def signup(user_in: UserSignUp):
     
     try:
         save_user(user_data)
-        message = f"User {user_in.user_id} created successfully"
-        return {"message": message, "user_id": user_in.user_id, "email": user_in.email}
+        logging.info(f"User {user_in.user_id} signed up successfully")
+        return {"user_id": user_in.user_id, "email": user_in.email}
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -47,6 +52,7 @@ async def login(user_login: UserLogin):
     
     # check if password is correct (done on frontend for now)
     if not user:
+        logging.error(f"User {user_login.username} not found")
         raise HTTPException(status_code=400, detail="User not found")
     
     access_token = create_access_token(data={"sub": user_login.username})
@@ -58,7 +64,9 @@ async def update_settings(request: UpdateUserSettingsRequest):
     
     try:
         update_user_settings(request.username, request.settings)
+        logging.info(f"User {request.username} settings updated")
     except Exception as e:
+        logging.error(f"Error updating user {request.username} settings: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     
     return {"message": "User settings updated"}
@@ -70,6 +78,7 @@ async def logout(request: UserLogout):
     user = get_user(request.username)
     
     if not user:
+        logging.error(f"User {request.username} not found to logout")
         raise HTTPException(status_code=400, detail="User not found")
         
     return {"message": f"{request.username} logged out successfully"}
