@@ -12,9 +12,6 @@ user_table = dynamodb.Table('Users')
 user_settings_table = dynamodb.Table('UserSettings')
 
 def save_user(user_data):
-    # Add the 'username' key, which maps to the email in your user data
-    user_data['username'] = user_data['email']
-    
     # check if the user already exists
     if check_user_exists(user_data['email']):
         raise Exception("User already exists")
