@@ -48,16 +48,16 @@ def create_dynamodb_tables():
     # Users table
     user_table = dynamodb.create_table(
         TableName='Users',
-        KeySchema=[{'AttributeName': 'username', 'KeyType': 'HASH'}],
-        AttributeDefinitions=[{'AttributeName': 'username', 'AttributeType': 'S'}],
+        KeySchema=[{'AttributeName': 'email', 'KeyType': 'HASH'}],
+        AttributeDefinitions=[{'AttributeName': 'email', 'AttributeType': 'S'}],
         ProvisionedThroughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
     )
 
     # User Settings table
     user_settings_table = dynamodb.create_table(
         TableName='UserSettings',
-        KeySchema=[{'AttributeName': 'username', 'KeyType': 'HASH'}],
-        AttributeDefinitions=[{'AttributeName': 'username', 'AttributeType': 'S'}],
+        KeySchema=[{'AttributeName': 'email', 'KeyType': 'HASH'}],
+        AttributeDefinitions=[{'AttributeName': 'email', 'AttributeType': 'S'}],
         ProvisionedThroughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
     )
 

@@ -25,7 +25,7 @@ def save_user(user_data):
 
 def check_user_exists(email):
     try:
-        response = user_table.get_item(Key={'username': email})
+        response = user_table.get_item(Key={'email': email})
         logger.info('Checked if user exists')
     except Exception as e:
         logger.error(f"Error checking if user exists: {e}")
@@ -34,7 +34,7 @@ def check_user_exists(email):
 
 def get_user(email):
     try:
-        response = user_table.get_item(Key={'username': email})
+        response = user_table.get_item(Key={'email': email})
         logger.info('User retrieved successfully')
     except Exception as e:
         logger.error(f"Error retrieving user: {e}")
@@ -42,13 +42,13 @@ def get_user(email):
     return response.get('Item')
 
 def update_user_settings(email, settings):
-    # check if the username exists to update the settings
+    # check if the email exists to update the settings
     if not check_user_exists(email):
         raise Exception("User does not exist")
     
     try:
         user_settings_table.update_item(
-            Key={'username': email},
+            Key={'email': email},
             UpdateExpression="SET #t = :t, notifications = :n, #lang = :l",
             ExpressionAttributeNames={
                 '#t': 'theme',
@@ -67,7 +67,7 @@ def update_user_settings(email, settings):
 
 def get_user_settings(email):
     try:
-        response = user_settings_table.get_item(Key={'username': email})
+        response = user_settings_table.get_item(Key={'email': email})
         logger.info('User settings retrieved successfully')
     except Exception as e:
         logger.error(f"Error retrieving user settings: {e}")
