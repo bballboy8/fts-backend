@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from app.auth.hashing import get_password_hash
+from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
 from app.models.user import save_user, get_user, update_user_settings
 from app.schemas.user import UserSignUp, UserLogin, UpdateUserSettingsRequest, UserLogout
@@ -50,11 +50,15 @@ async def login(user_login: UserLogin):
     
     # check if user is in database (simple for now)
     user = get_user(user_login.email)
-    
+        
     # check if password is correct (done on frontend for now)
     if not user:
         logging.error(f"User {user_login.email} not found")
         raise HTTPException(status_code=400, detail="User not found")
+    
+    if not verify_password(user_login.password, user['hashed_password']):
+        logging.error(f"User {user_login.email} incorrect password")
+        raise HTTPException(status_code=400, detail="Incorrect Password")
     
     access_token = create_access_token(data={"sub": user_login.email})
     message = f"User {user_login.email} logged in successfully"
