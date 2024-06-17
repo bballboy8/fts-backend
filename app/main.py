@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.routers import user
+from app.routers import nasdaq
 from app.services.dynamodb_service import DynamoDBService
 from app.services.dynamodb_service import create_dynamodb_tables
 
@@ -10,6 +11,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 app = FastAPI()
 
 app.include_router(user.router)
+app.include_router(nasdaq.router)
 
 @app.on_event("startup")
 async def startup_event():

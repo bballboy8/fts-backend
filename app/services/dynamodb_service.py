@@ -13,6 +13,7 @@ load_dotenv()
 
 class DynamoDBService:
     _resource = None
+    _nasdaq = None
 
     @classmethod
     def get_resource(cls):
@@ -35,6 +36,28 @@ class DynamoDBService:
             except Exception as e:
                 logging.error(f"Error creating DynamoDB resource: {str(e)}")
         return cls._resource
+    
+    @classmethod
+    def get_nasdaq_table(cls) :
+        config = Config(connect_timeout=5, read_timeout=5, retries={'max_attempts': 5})
+
+        # Add a try-except block to catch exceptions
+        try:
+            access_key = os.getenv('NASDQA_ACCESS_KEY_ID')
+            secret_access = os.getenv('NASDQA_SECRET_ACCESS_KEY')
+            region = os.getenv('NASDQA_DEFAULT_REGION')
+
+            cls._nasdaq = boto3.resource(
+                'dynamodb',
+                region_name=region,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_access,
+                config=config
+            )
+            logging.info("DynamoDB resource created successfully")  
+        except Exception as e:
+            logging.error(f"Error creating DynamoDB resource: {str(e)}")
+        return cls._nasdaq
 
 def create_dynamodb_tables():
     dynamodb = DynamoDBService.get_resource()
