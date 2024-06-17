@@ -17,14 +17,9 @@ router = APIRouter(
 @router.post("/get_data")
 async def get_nasdaq_data_by_date(request: Nasdaq):
     nasdaq_table_data = get_nasdaq_data(request.target_date)
-    result = []
-    for row in nasdaq_table_data :
-        result.append(str(row))
-    response = json.dumps(result)
     try:
         logging.info(f"Fetched table successfully")
-        return JSONResponse(content=response, status_code=201)
-        
+        return JSONResponse(content=nasdaq_table_data, status_code=201)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
