@@ -8,3 +8,4 @@ class Nasdaq(BaseModel):
         email (str): The username of the user.
     """
     target_date: str
+    symbol : str

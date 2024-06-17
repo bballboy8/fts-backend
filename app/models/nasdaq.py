@@ -31,18 +31,21 @@ def calculateNanoSec(hour, min, sec, milisec):
     return (hour * 3600 + min * 60 + sec) * 1000 * 1000000 + milisec * 1000000
 
 
-def get_nasdaq_data(date):
+def get_nasdaq_data(date, symbol = 'AAPL'):
     start_time = time.time()
     response = nasdaq_table.query(
         IndexName='fetch_index',
-        KeyConditionExpression=Key('date').eq(date)
+        KeyConditionExpression=Key('date').eq(date),
+        FilterExpression= Attr('symbol').eq(symbol)
     )
     result = {
         "headers" : ["trackingID", "date", "msgType", "symbol", "price"],
         "data" : []
     }
     for item in response['Items']:
-        result['data'].append([int(item['trackingID']),item['date'],item['msgType'],item['symbol'],int(item['price'])])
+        # print(item)
+        result['data'].append([int(item['trackingID']),item['date'],item['msgType'],item['symbol'],int(item['price']) if 'price' in item else -1])
+    print(len(result['data']))
     return result
 
 # Print the response
