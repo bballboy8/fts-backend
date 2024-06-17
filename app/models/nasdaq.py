@@ -37,12 +37,12 @@ def get_nasdaq_data(date):
         IndexName='fetch_index',
         KeyConditionExpression=Key('date').eq(date)
     )
-    result = []
+    result = {
+        "headers" : ["trackingID", "date", "msgType", "symbol", "price"],
+        "data" : []
+    }
     for item in response['Items']:
-        item['trackingID'] = int(item['trackingID'])
-        item['SoupSequence'] = int(item['SoupSequence'])
-        item['price'] = int(item['price'])
-        result.append(item)
+        result['data'].append([int(item['trackingID']),item['date'],item['msgType'],item['symbol'],int(item['price'])])
     return result
 
 # Print the response
