@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from app.routers import user
 from app.routers import nasdaq
 from app.services.dynamodb_service import DynamoDBService

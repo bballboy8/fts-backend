@@ -21,30 +21,44 @@ dynamodb = DynamoDBService.get_nasdaq_table()
 # (begins with a specific prefix) and the 'trackingID' attribute (within a specific range of values).
 # The scan operation retrieves items from the table based on these criteria and prints them out.
 nasdaq_table = dynamodb.Table('NASDAQ2')
-response = nasdaq_table.query(
-    IndexName='fetch_index',
-    KeyConditionExpression=Key('date').eq("2024-06-17")
-)
 
 
 def calculateNanoSec(hour, min, sec, milisec):
     return (hour * 3600 + min * 60 + sec) * 1000 * 1000000 + milisec * 1000000
 
 
-def get_nasdaq_data(date, symbol = 'AAPL'):
+def get_nasdaq_data(date, symbol='AAPL'):
     start_time = time.time()
+    result = {
+        "headers": ["trackingID", "date", "msgType", "symbol", "price"],
+        "data": []
+    }
     response = nasdaq_table.query(
         IndexName='fetch_index',
         KeyConditionExpression=Key('date').eq(date),
+        Limit = 100000,
         FilterExpression= Attr('symbol').eq(symbol)
     )
-    result = {
-        "headers" : ["trackingID", "date", "msgType", "symbol", "price"],
-        "data" : []
-    }
     for item in response['Items']:
-        # print(item)
-        result['data'].append([int(item['trackingID']),item['date'],item['msgType'],item['symbol'],int(item['price']) if 'price' in item else -1])
+        result['data'].append([int(item['trackingID']), item['date'], item['msgType'], item['symbol'], int(
+            item['price']) if 'price' in item else -1])
+    
+    cnt = len(response['Items'])
+    while 'LastEvaluatedKey' in response:
+        response = nasdaq_table.query(
+            IndexName='fetch_index',
+            KeyConditionExpression=Key('date').eq(date),
+            Limit = 100000,
+            
+            ExclusiveStartKey=response['LastEvaluatedKey'],
+            FilterExpression= Attr('symbol').eq(symbol)
+        )
+
+        cnt += len(response['Items'])
+        for item in response['Items']:
+            result['data'].append([int(item['trackingID']), item['date'], item['msgType'], item['symbol'], int(
+                item['price']) if 'price' in item else -1])
+        print(cnt)
     print(len(result['data']))
     return result
 
