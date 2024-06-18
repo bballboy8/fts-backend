@@ -142,6 +142,7 @@ def init_nasdaq_kafka_connection():
     ncds_client = NCDSClient(security_cfg, kafka_cfg)
     topic = "NLSUTP"
     consumer = ncds_client.ncds_kafka_consumer(topic)
+    logging.info(f"Success to connect NASDAQ Kafka server.")
     return consumer
     # print(messages)
 
@@ -154,7 +155,6 @@ async def listen_message_from_nasdaq_kafka(consumer):
             if connection['isRunning']:
                 webSocket = connection['socket']
                 await webSocket.send_json(response)
-        print(len(messages))
 
 consumer = init_nasdaq_kafka_connection()
 
@@ -165,7 +165,6 @@ def between_callback():
 
     loop.run_until_complete(listen_message_from_nasdaq_kafka(consumer))
     loop.close()
-
 
 nasdaq_kafka_thread = Thread(target=between_callback)
 nasdaq_kafka_thread.start()
