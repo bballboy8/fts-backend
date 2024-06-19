@@ -131,18 +131,6 @@ async def get_nasdaq_data(date=None):
         return result
 
 
-async def list_dynamodb_tables():
-    session = aioboto3.Session()
-    async with session.client("dynamodb") as dynamodb_client:
-        response = await dynamodb_client.list_tables()
-        return response.get("TableNames", [])
-
-
-if __name__ == "__main__":
-    tables = asyncio.run(list_dynamodb_tables())
-    print("Tables in DynamoDB:", tables)
-
-
 # if __name__ == "__main__":
 #     date_to_query = "2024-06-18"
 #     result = asyncio.run(get_nasdaq_data(date_to_query))
