@@ -1,163 +1,149 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
-from app.schemas.nasdaq import Nasdaq
-from app.models.nasdaq import get_nasdaq_data
-from fastapi import WebSocket, WebSocketDisconnect
-from concurrent.futures import Future
-from threading import Thread
-from ncdssdk import NCDSClient
-import pytz, asyncio, os, logging, json
-from datetime import timedelta, datetime
+import asyncio
+import logging
+from datetime import datetime
+import pytz
+import aioboto3
+from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Key, Attr
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/nasdaq", tags=["nasdaq"])
 
-utc_datetime = datetime.utcnow()
-# Set the desired timezone
-desired_timezone = pytz.timezone("America/New_York")
-# Convert the UTC time to the desired timezone
-localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(desired_timezone)
-midnight_time = datetime.combine(localized_datetime, datetime.min.time())
+def calculateNanoSec(hour, min, sec, milisec):
+    return (hour * 3600 + min * 60 + sec) * 1000 * 1000000 + milisec * 1000000
 
 
-def call_with_future(fn, future, args, kwargs):
-    try:
-        result = fn(*args, **kwargs)
-        future.set_result(result)
-    except Exception as exc:
-        future.set_exception(exc)
+async def get_nasdaq_data(date=None):
+    session = aioboto3.Session()
+    async with session.resource("dynamodb") as dynamodb:
+        try:
+            nasdaq_table = await dynamodb.Table("NASDAQ2")
+            # Verify table exists
+            await nasdaq_table.load()
+            logger.info("Table 'NASDAQ2' loaded successfully.")
 
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        future = Future()
-        Thread(target=call_with_future, args=(fn, future, args, kwargs)).start()
-        return future
-
-    return wrapper
-
-
-class WebSocketManager:
-    """Class defining socket events"""
-
-    def __init__(self):
-        """init method, keeping track of connections"""
-        self.active_connections = []
-        self.isRunning = False
-
-    async def connect(self, websocket: WebSocket):
-        """connect event"""
-        await websocket.accept()
-        self.active_connections.append({"isRunning": False, "socket": websocket})
-
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        """Direct Message"""
-        await websocket.send_text(message)
-
-    def startStream(self, websocket: WebSocket):
-        for idx, connection in enumerate(self.active_connections):
-            if connection["socket"] == websocket:
-                self.active_connections[idx]["isRunning"] = True
-                break
-
-    def stopStream(self, websocket: WebSocket):
-        for idx, connection in enumerate(self.active_connections):
-            if connection["socket"] == websocket:
-                self.active_connections[idx]["isRunning"] = False
-                break
-
-    def disconnect(self, websocket: WebSocket):
-        """disconnect event"""
-        for connection in self.active_connections:
-            if connection["socket"] == websocket:
-                print("found")
-                self.active_connections.remove(connection)
-                break
-
-
-manager = WebSocketManager()
-
-
-@router.websocket("/get_real_data")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            if data == "start":
-                manager.startStream(websocket)
-            elif data == "stop":
-                manager.stopStream(websocket)
-            await manager.send_personal_message(f"Received:{data}", websocket)
-    except WebSocketDisconnect:
-        await manager.send_personal_message("Bye!!!", websocket)
-        manager.disconnect(websocket)
-
-
-@router.post("/get_data")
-async def get_nasdaq_data_by_date(request: Nasdaq):
-    nasdaq_table_data = await get_nasdaq_data(request.target_date)
-    try:
-        logging.info("Fetched table successfully")
-        return JSONResponse(content=nasdaq_table_data, status_code=201)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-def makeRespFromKafkaMessages(messages):
-    resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
-    for message in messages:
-        msg = message.value()
-        trackingID = int(msg["trackingID"])
-        message_time = midnight_time + timedelta(milliseconds=trackingID / 1000000)
-        resp["data"].append(
-            (
-                [
-                    int(msg["trackingID"]),
-                    message_time.strftime("%Y-%m-%d"),
-                    msg["msgType"],
-                    msg["symbol"],
-                    int(msg["price"]) if "price" in msg else -1,
-                ]
+            # Verify GSI exists
+            table_info = await nasdaq_table.meta.client.describe_table(
+                TableName="NASDAQ2"
             )
+            indexes = [
+                index["IndexName"]
+                for index in table_info.get("Table", {}).get(
+                    "GlobalSecondaryIndexes", []
+                )
+            ]
+            if "fetch_index" not in indexes:
+                logger.error("Index 'fetch_index' does not exist on table 'NASDAQ2'.")
+                return
+            logger.info("Index 'fetch_index' verified successfully.")
+
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "ResourceNotFoundException":
+                logger.error("The table NASDAQ2 or index fetch_index does not exist.")
+                return
+            else:
+                raise e
+
+        utc_datetime = datetime.utcnow()
+        desired_timezone = pytz.timezone("America/New_York")
+        localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(
+            desired_timezone
         )
-    return resp
+        midnight_time = datetime.combine(localized_datetime, datetime.min.time())
+
+        result = {
+            "headers": ["trackingID", "date", "msgType", "symbol", "price"],
+            "data": [],
+        }
+
+        keyExpression = Key("date").eq(
+            date if date else midnight_time.strftime("%Y-%m-%d")
+        )
+        filterExpression = Attr("trackingID").gte(0)
+
+        logger.info(
+            f"Querying NASDAQ data for date: {date if date else midnight_time.strftime('%Y-%m-%d')}"
+        )
+
+        async def query_table(exclusive_start_key=None):
+            query_args = {
+                "IndexName": "fetch_index",
+                "KeyConditionExpression": keyExpression,
+                "Limit": 100000,
+                "FilterExpression": filterExpression,
+            }
+            if exclusive_start_key:
+                query_args["ExclusiveStartKey"] = exclusive_start_key
+
+            try:
+                response = await nasdaq_table.query(**query_args)
+                return response
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "ResourceNotFoundException":
+                    logger.error(
+                        "The requested resource was not found during the query operation."
+                    )
+                    return None
+                else:
+                    raise e
+
+        response = await query_table()
+        if response is None:
+            return result
+
+        logger.info(f"Initial query returned {len(response['Items'])} items.")
+
+        async def process_items(items):
+            for item in items:
+                try:
+                    result["data"].append(
+                        [
+                            int(item["trackingID"]),
+                            item["date"],
+                            item["msgType"],
+                            item["symbol"] if "symbol" in item else "",
+                            int(item["price"]) if "price" in item else -1,
+                        ]
+                    )
+                except Exception as e:
+                    logger.error(f"Error occurs when saving data: {e}")
+
+        await process_items(response["Items"])
+
+        cnt = len(response["Items"])
+        tasks = []
+
+        while "LastEvaluatedKey" in response:
+            response = await query_table(response["LastEvaluatedKey"])
+            if response is None:
+                break
+            cnt += len(response["Items"])
+            logger.info(
+                f"Query returned {len(response['Items'])} items, total count so far: {cnt}"
+            )
+            tasks.append(process_items(response["Items"]))
+
+        if tasks:
+            await asyncio.gather(*tasks)
+
+        logger.info(f"Total items retrieved: {cnt}")
+        return result
 
 
-def init_nasdaq_kafka_connection():
-    print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
-    security_cfg = {
-        "oauth.token.endpoint.uri": os.getenv("NASDAQ_KAFKA_ENDPOINT"),
-        "oauth.client.id": os.getenv("NASDAQ_KAFKA_CLIENT_ID"),
-        "oauth.client.secret": os.getenv("NASDAQ_KAFKA_CLIENT_SECRET"),
-    }
-    kafka_cfg = {
-        "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
-        # "bootstrap.servers": "{streams_endpoint_url}:9094",
-        "auto.offset.reset": "latest",
-    }
-
-    ncds_client = NCDSClient(security_cfg, kafka_cfg)
-    topic = "NLSUTP"
-    consumer = ncds_client.ncds_kafka_consumer(topic)
-    logging.info(f"Success to connect NASDAQ Kafka server.")
-    return consumer
-    # print(messages)
-
-
-async def listen_message_from_nasdaq_kafka(consumer):
-    while True:
-        messages = consumer.consume(num_messages=2000, timeout=10)
-        response = makeRespFromKafkaMessages(messages)
-        for idx, connection in enumerate(manager.active_connections):
-            if connection["isRunning"]:
-                webSocket = connection["socket"]
-                await webSocket.send_json(response)
+async def list_dynamodb_tables():
+    session = aioboto3.Session()
+    async with session.client("dynamodb") as dynamodb_client:
+        response = await dynamodb_client.list_tables()
+        return response.get("TableNames", [])
 
 
 if __name__ == "__main__":
-    date_to_query = "2024-06-18"
-    result = asyncio.run(get_nasdaq_data(date_to_query))
-    print(result)
+    tables = asyncio.run(list_dynamodb_tables())
+    print("Tables in DynamoDB:", tables)
+
+
+# if __name__ == "__main__":
+#     date_to_query = "2024-06-18"
+#     result = asyncio.run(get_nasdaq_data(date_to_query))
+#     print(result)
