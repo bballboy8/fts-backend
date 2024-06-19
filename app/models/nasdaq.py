@@ -84,8 +84,11 @@ def get_nasdaq_data(date=None, timestamp=0, symbol=None):
 
         cnt += len(response['Items'])
         for item in response['Items']:
-            result['data'].append([int(item['trackingID']), item['date'], item['msgType'], item['symbol'], int(
-                item['price']) if 'price' in item else -1])
+            try :
+                result['data'].append([int(item['trackingID']), item['date'], item['msgType'], item['symbol'] if 'symbol' in item else '', int(
+                    item['price']) if 'price' in item else -1])
+            except Exception as e:
+                logging.error(f"Error occurs when savind data : {e}")
         print(len(result['data']))
     print(len(result['data']))
     return result
