@@ -15,20 +15,18 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-dynamodb = DynamoDBService.get_nasdaq_table()
 # The `nasdaq_table` variable is representing a DynamoDB table named 'NASDAQ1'. It is being used to
 # perform a scan operation on the table to retrieve items that meet certain filter criteria specified
 # in the `scan_kwargs` dictionary. The filter criteria include conditions on the 'id' attribute
 # (begins with a specific prefix) and the 'trackingID' attribute (within a specific range of values).
 # The scan operation retrieves items from the table based on these criteria and prints them out.
-nasdaq_table = dynamodb.Table('NASDAQ2')
-
 
 def calculateNanoSec(hour, min, sec, milisec):
     return (hour * 3600 + min * 60 + sec) * 1000 * 1000000 + milisec * 1000000
 
-
-def get_nasdaq_data(date=None, timestamp=0, symbol=None):
+async def get_nasdaq_data(date=None, timestamp=0, symbol=None):
+    dynamodb = await DynamoDBService.get_nasdaq_table()
+    nasdaq_table = await dynamodb.Table('NASDAQ2')
     start_time = time.time()
     # Calculate the datetime
 
@@ -62,7 +60,7 @@ def get_nasdaq_data(date=None, timestamp=0, symbol=None):
     if symbol is not None:
         filterExpression &= Attr('symbol').eq(symbol)
 
-    response = nasdaq_table.query(
+    response = await nasdaq_table.query(
         IndexName='fetch_index',
         KeyConditionExpression=keyExpression,
         Limit=100000,
@@ -74,7 +72,7 @@ def get_nasdaq_data(date=None, timestamp=0, symbol=None):
 
     cnt = len(response['Items'])
     while 'LastEvaluatedKey' in response:
-        response = nasdaq_table.query(
+        response = await nasdaq_table.query(
             IndexName='fetch_index',
             KeyConditionExpression=keyExpression,
             Limit=100000,
