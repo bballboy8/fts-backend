@@ -104,7 +104,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @router.post("/get_data")
 async def get_nasdaq_data_by_date(request: Nasdaq):
-    nasdaq_table_data = get_nasdaq_data(request.target_date, request.timestamp, request.symbol)
+    nasdaq_table_data = await get_nasdaq_data(request.target_date, request.timestamp, request.symbol)
     try:
         logging.info(f"Fetched table successfully")
         return JSONResponse(content=nasdaq_table_data, status_code=201)
