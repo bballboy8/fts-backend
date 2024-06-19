@@ -15,6 +15,16 @@ router = APIRouter(
     tags=["user"]
 )
 
+@router.post("/exist_email")
+async def email_existence(request : UserLogout) :
+    user = get_user(request.email)
+    
+    if not user:
+        logging.error(f"User {request.email} not exist on the database")
+        return {"exist": False}
+        
+    return {"exist": True}
+
 @router.post("/signup/")
 async def signup(user_in: UserSignUp):
     hashed_password = get_password_hash(user_in.password)
@@ -43,7 +53,6 @@ async def signup(user_in: UserSignUp):
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
     
 @router.post("/login/")
 async def login(user_login: UserLogin):
