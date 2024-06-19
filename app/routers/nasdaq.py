@@ -86,30 +86,30 @@ class WebSocketManager:
 manager = WebSocketManager()
 
 
-@router.websocket("/get_real_data")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            if data == 'start':
-                manager.startStream(websocket)
-            elif data == 'stop':
-                manager.stopStream(websocket)
-            await manager.send_personal_message(f"Received:{data}", websocket)
-    except WebSocketDisconnect:
-        await manager.send_personal_message("Bye!!!", websocket)
-        manager.disconnect(websocket)
+# @router.websocket("/get_real_data")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await manager.connect(websocket)
+#     try:
+#         while True:
+#             data = await websocket.receive_text()
+#             if data == 'start':
+#                 manager.startStream(websocket)
+#             elif data == 'stop':
+#                 manager.stopStream(websocket)
+#             await manager.send_personal_message(f"Received:{data}", websocket)
+#     except WebSocketDisconnect:
+#         await manager.send_personal_message("Bye!!!", websocket)
+#         manager.disconnect(websocket)
 
 
-@router.post("/get_data")
-async def get_nasdaq_data_by_date(request: Nasdaq):
-    nasdaq_table_data = await get_nasdaq_data(request.target_date, request.timestamp, request.symbol)
-    try:
-        logging.info(f"Fetched table successfully")
-        return JSONResponse(content=nasdaq_table_data, status_code=201)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# @router.post("/get_data")
+# async def get_nasdaq_data_by_date(request: Nasdaq):
+#     nasdaq_table_data = await get_nasdaq_data(request.target_date, request.timestamp, request.symbol)
+#     try:
+#         logging.info(f"Fetched table successfully")
+#         return JSONResponse(content=nasdaq_table_data, status_code=201)
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
 
 def makeRespFromKafkaMessages(messages):
