@@ -104,7 +104,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @router.post("/get_data")
 async def get_nasdaq_data_by_date(request: Nasdaq):
-    nasdaq_table_data = get_nasdaq_data(request.target_date, request.symbol)
+    nasdaq_table_data = get_nasdaq_data(request.target_date, request.timestamp, request.symbol)
     try:
         logging.info(f"Fetched table successfully")
         return JSONResponse(content=nasdaq_table_data, status_code=201)
@@ -156,8 +156,7 @@ async def listen_message_from_nasdaq_kafka(consumer):
                 webSocket = connection['socket']
                 await webSocket.send_json(response)
 
-consumer = init_nasdaq_kafka_connection()
-
+# consumer = init_nasdaq_kafka_connection()
 
 def between_callback():
     loop = asyncio.new_event_loop()
@@ -166,5 +165,5 @@ def between_callback():
     loop.run_until_complete(listen_message_from_nasdaq_kafka(consumer))
     loop.close()
 
-nasdaq_kafka_thread = Thread(target=between_callback)
-nasdaq_kafka_thread.start()
+# nasdaq_kafka_thread = Thread(target=between_callback)
+# nasdaq_kafka_thread.start()

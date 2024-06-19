@@ -7,5 +7,6 @@ class Nasdaq(BaseModel):
     Attributes:
         email (str): The username of the user.
     """
-    target_date: str
-    symbol : str
+    target_date: str | None = None
+    timestamp: int | None = None
+    symbol : str | None = None
