@@ -33,7 +33,7 @@ async def fetch_all_data(symbol=None, start_datetime=None):
         start_datetime = datetime.strptime(start_datetime, "%Y-%m-%d %H:%M:%S")
 
     # Base query
-    query = "SELECT * FROM stock_data where message_type = 'T'"
+    query = "SELECT * FROM stock_data where msgType = 'T'"
     conditions = []
     values = []
 
