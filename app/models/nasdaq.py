@@ -33,7 +33,7 @@ async def fetch_all_data(symbol=None, start_datetime=None):
         start_datetime = datetime.strptime(start_datetime, "%Y-%m-%d %H:%M:%S")
 
     # Base query
-    query = "SELECT * FROM stock_data"
+    query = "SELECT * FROM stock_data where message_type = 'T'"
     conditions = []
     values = []
 
@@ -46,7 +46,7 @@ async def fetch_all_data(symbol=None, start_datetime=None):
         values.append(start_datetime)
 
     if conditions:
-        query += " WHERE " + " AND ".join(conditions)
+        query += " AND ".join(conditions)
 
     logger.info(f"Executing query: {query}")
     logger.info(f"With values: {values}")
