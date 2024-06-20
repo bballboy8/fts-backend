@@ -153,7 +153,7 @@ async def listen_message_from_nasdaq_kafka(consumer):
                 await webSocket.send_json(response)
 
 
-# consumer = init_nasdaq_kafka_connection()
+consumer = init_nasdaq_kafka_connection()
 
 
 def between_callback():
@@ -164,5 +164,5 @@ def between_callback():
     loop.close()
 
 
-# nasdaq_kafka_thread = Thread(target=between_callback)
-# nasdaq_kafka_thread.start()
+nasdaq_kafka_thread = Thread(target=between_callback)
+nasdaq_kafka_thread.start()
