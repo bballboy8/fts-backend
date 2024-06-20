@@ -76,9 +76,7 @@ class WebSocketManager:
                 self.active_connections.remove(connection)
                 break
 
-
 manager = WebSocketManager()
-
 
 @router.websocket("/get_real_data")
 async def websocket_endpoint(websocket: WebSocket):
@@ -92,8 +90,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 manager.stopStream(websocket)
             await manager.send_personal_message(f"Received:{data}", websocket)
     except WebSocketDisconnect:
-        await manager.send_personal_message("Bye!!!", websocket)
+        print('disconnected')
         manager.disconnect(websocket)
+        # await manager.send_personal_message("Bye!!!", websocket)
 
 
 @router.post("/get_data")
@@ -147,14 +146,16 @@ async def listen_message_from_nasdaq_kafka(consumer):
     while True:
         messages = consumer.consume(num_messages=2000, timeout=10)
         response = makeRespFromKafkaMessages(messages)
+        # print(len(manager.active_connections))
         for idx, connection in enumerate(manager.active_connections):
             if connection["isRunning"]:
                 webSocket = connection["socket"]
-                await webSocket.send_json(response)
-
+                try :
+                    await webSocket.send_json(response)
+                except Exception as e:
+                    logging.error(f"Error occured while sending data to client: {e}")
 
 consumer = init_nasdaq_kafka_connection()
-
 
 def between_callback():
     loop = asyncio.new_event_loop()
