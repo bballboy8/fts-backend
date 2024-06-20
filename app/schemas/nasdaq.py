@@ -1,4 +1,6 @@
+from typing import Optional
 from pydantic import BaseModel
+
 
 class Nasdaq(BaseModel):
     """
@@ -7,6 +9,6 @@ class Nasdaq(BaseModel):
     Attributes:
         email (str): The username of the user.
     """
-    target_date: str | None = None
-    timestamp: int | None = None
-    symbol : str | None = None
+
+    start_datetime: Optional[str]
+    symbol: Optional[str]
