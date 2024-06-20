@@ -3,6 +3,7 @@ import os
 import dotenv
 import asyncpg
 import asyncio
+from datetime import datetime
 
 dotenv.load_dotenv()
 
@@ -27,33 +28,41 @@ async def fetch_all_data(symbol=None, start_datetime=None):
         port=db_params["port"],
     )
 
+    # Convert start_datetime to a datetime object if provided
+    if start_datetime:
+        start_datetime = datetime.strptime(start_datetime, "%Y-%m-%d %H:%M:%S")
+
     # Base query
     query = "SELECT * FROM stock_data"
+    conditions = []
+    values = []
 
     # Adding filters if they are provided
-    conditions = []
     if symbol:
-        conditions.append(f"symbol = {symbol}")
+        conditions.append("symbol = $1")
+        values.append(symbol)
     if start_datetime:
-        conditions.append(f"date >= {start_datetime}")
+        conditions.append(f"date >= ${len(values) + 1}::timestamp")
+        values.append(start_datetime)
 
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
-    # Prepare values for the query
-    values = []
-    if symbol:
-        values.append(symbol)
-    if start_datetime:
-        values.append(start_datetime)
+    logger.info(f"Executing query: {query}")
+    logger.info(f"With values: {values}")
 
-    # Execute the query with the values
-    records = await conn.fetch(query, *values)
+    try:
+        # Execute the query with the values
+        records = await conn.fetch(query, *values)
+    except Exception as e:
+        logger.error(f"Error executing query: {e}")
+        raise
+    finally:
+        await conn.close()
 
-    await conn.close()
     return records
 
 
 # Example usage
 if __name__ == "__main__":
-    asyncio.run(fetch_all_data())
+    asyncio.run(fetch_all_data(symbol=None, start_datetime="2023-06-19 14:30:00"))
