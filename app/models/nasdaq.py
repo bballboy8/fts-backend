@@ -39,14 +39,14 @@ async def fetch_all_data(symbol=None, start_datetime=None):
 
     # Adding filters if they are provided
     if symbol:
-        conditions.append("symbol = $1")
+        conditions.append(" and symbol = $1")
         values.append(symbol)
     if start_datetime:
-        conditions.append(f"date >= ${len(values) + 1}::timestamp")
+        conditions.append(f" and date >= ${len(values) + 1}::timestamp")
         values.append(start_datetime)
 
     if conditions:
-        query += " AND ".join(conditions)
+        query += " ".join(conditions)
 
     logger.info(f"Executing query: {query}")
     logger.info(f"With values: {values}")
