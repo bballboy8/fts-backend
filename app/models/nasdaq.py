@@ -13,8 +13,8 @@ dotenv.load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-MAX_CONCURRENT_QUERIES = 10
-QUERY_LIMIT = 10000
+MAX_CONCURRENT_QUERIES = 10  # Increase the number of concurrent queries
+QUERY_LIMIT = 10000  # Increase the query limit to fetch more items per batch
 
 
 def calculateNanoSec(hour, min, sec, milisec):
@@ -42,31 +42,25 @@ async def get_nasdaq_data(date=None, symbol="AAPL"):
             else:
                 raise e
 
-        if date:
-            if isinstance(date, str):
-                date_obj = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
-            elif isinstance(date, datetime):
-                date_obj = date
-            else:
-                raise ValueError("date must be a string or datetime object")
-        else:
-            utc_datetime = datetime.utcnow()
-            desired_timezone = pytz.timezone("America/New_York")
-            localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(
-                desired_timezone
-            )
-            date_obj = datetime.combine(localized_datetime, time.min)
+        utc_datetime = datetime.utcnow()
+        desired_timezone = pytz.timezone("America/New_York")
+        localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(
+            desired_timezone
+        )
+        midnight_time = datetime.combine(localized_datetime, time.min)
 
         result = {
             "headers": ["trackingID", "date", "msgType", "symbol", "price"],
             "data": [],
         }
 
-        keyExpression = Key("date").eq(date_obj.strftime("%Y-%m-%d"))
+        keyExpression = Key("date").eq(
+            date if date else midnight_time.strftime("%Y-%m-%d")
+        )
         filterExpression = Attr("trackingID").gte(0) & Attr("symbol").eq(symbol)
 
         logger.info(
-            f"Querying NASDAQ data for date: {date_obj.strftime('%Y-%m-%d %H:%M:%S')} and symbol: {symbol} at {datetime.now()}"
+            f"Querying NASDAQ data for date: {date if date else midnight_time.strftime('%Y-%m-%d')} and symbol: {symbol} at {datetime.now()}"
         )
 
         async def query_table(exclusive_start_key=None):
@@ -137,8 +131,16 @@ async def get_nasdaq_data(date=None, symbol="AAPL"):
         return result
 
 
+async def main():
+    date_to_query = "2024-06-18"
+    symbols_to_query = ["AAPL", "NVDA", "MSFT"]
+    tasks = [get_nasdaq_data(date_to_query, symbol) for symbol in symbols_to_query]
+    results = await asyncio.gather(*tasks)
+
+    for symbol, result in zip(symbols_to_query, results):
+        print(f"Results for {symbol}:")
+        print(result)
+
+
 if __name__ == "__main__":
-    date_to_query = "2024-06-18 14:30:00"
-    symbol_to_query = "AAPL"
-    result = asyncio.run(get_nasdaq_data(date_to_query, symbol_to_query))
-    print(result)
+    asyncio.run(main())
