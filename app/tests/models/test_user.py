@@ -4,7 +4,7 @@
 # pip install pytest-mock
 import pytest
 
-from models.user import save_user
+from app.models.user import save_user
 
 
 class TestSaveUser:
