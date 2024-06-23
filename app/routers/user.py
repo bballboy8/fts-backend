@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
-from app.models.user import save_user, get_user, update_user_settings
+from app.models.user import check_user_exists, save_user, get_user, update_user_settings
 from app.main import db_params
 from app.schemas.user import (
     UserSignUp,
@@ -22,22 +22,7 @@ router = APIRouter(prefix="/user", tags=["user"])
 
 @router.post("/exist_email")
 async def email_existence(request: UserLogout):
-    conn = await asyncpg.connect(**db_params)
-
-    # Base query
-    query = "SELECT count(*) FROM users WHERE email = $1"
-
-    try:
-        # Execute the query with the email parameter
-        record = await conn.fetchval(query, request.email)
-    except Exception as e:
-        logger.error(f"Error executing query: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-    finally:
-        await conn.close()
-
-    # Return True if there's at least one record, False otherwise
-    return {"exists": record > 0}
+    return check_user_exists(request.email)
 
 
 @router.post("/signup/")

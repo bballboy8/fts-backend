@@ -5,13 +5,14 @@
 import pytest
 
 from app.models.nasdaq import fetch_all_data
-from app.main import db_params
 
 
 class TestFetchAllData:
     # fetches all data when no filters are applied
     @pytest.mark.asyncio
     async def test_fetches_all_data_no_filters(self, mocker):
+        from app.main import db_params
+
         mock_conn = mocker.patch("app.models.nasdaq.asyncpg.connect")
         mock_conn.return_value.fetch.return_value = []
 
