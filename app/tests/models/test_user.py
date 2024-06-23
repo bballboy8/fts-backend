@@ -4,14 +4,13 @@
 # pip install pytest-mock
 import pytest
 
-from app.models.user import save_user
-
 
 class TestSaveUser:
     # Successfully saves a valid user with all required fields
     @pytest.mark.asyncio
     async def test_save_valid_user(self, mocker):
         from app.main import db_params
+        from app.models.user import save_user
 
         # Arrange
         user_data = {
