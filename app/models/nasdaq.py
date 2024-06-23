@@ -5,10 +5,11 @@ import asyncpg
 import asyncio
 from datetime import datetime
 
+from application_logger import init_logger
+
 dotenv.load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 
 async def fetch_all_data(symbol=None, start_datetime=None):

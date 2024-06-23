@@ -5,13 +5,15 @@ from app.models.nasdaq import fetch_all_data
 from fastapi import WebSocket, WebSocketDisconnect
 from concurrent.futures import Future
 from threading import Thread
+from application_logger import init_logger
 from ncdssdk import NCDSClient
-import pytz, asyncio, os, logging
+import pytz
+import asyncio
+import os
+import logging
 from datetime import timedelta, datetime
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+logger = init_logger(__name__)
 router = APIRouter(prefix="/nasdaq", tags=["nasdaq"])
 
 utc_datetime = datetime.utcnow()
@@ -76,7 +78,9 @@ class WebSocketManager:
                 self.active_connections.remove(connection)
                 break
 
+
 manager = WebSocketManager()
+
 
 @router.websocket("/get_real_data")
 async def websocket_endpoint(websocket: WebSocket):
@@ -90,7 +94,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 manager.stopStream(websocket)
             await manager.send_personal_message(f"Received:{data}", websocket)
     except WebSocketDisconnect:
-        print('disconnected')
+        print("disconnected")
         manager.disconnect(websocket)
         # await manager.send_personal_message("Bye!!!", websocket)
 
@@ -113,7 +117,7 @@ def makeRespFromKafkaMessages(messages):
                     int(msg["trackingID"]),
                     message_time.strftime("%Y-%m-%d"),
                     msg["msgType"],
-                    msg["symbol"] if 'symbol' in msg else '',
+                    msg["symbol"] if "symbol" in msg else "",
                     int(msg["price"]) if "price" in msg else -1,
                 ]
             )
@@ -150,12 +154,14 @@ async def listen_message_from_nasdaq_kafka(consumer):
         for idx, connection in enumerate(manager.active_connections):
             if connection["isRunning"]:
                 webSocket = connection["socket"]
-                try :
+                try:
                     await webSocket.send_json(response)
                 except Exception as e:
                     logging.error(f"Error occured while sending data to client: {e}")
 
+
 consumer = init_nasdaq_kafka_connection()
+
 
 def between_callback():
     loop = asyncio.new_event_loop()

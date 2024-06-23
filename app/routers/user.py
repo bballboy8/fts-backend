@@ -1,10 +1,8 @@
-import asyncpg
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
 from app.models.user import check_user_exists, save_user, get_user, update_user_settings
-from app.main import db_params
 from app.schemas.user import (
     UserSignUp,
     UserLogin,
@@ -14,8 +12,9 @@ from app.schemas.user import (
 
 import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from application_logger import init_logger
+
+logger = init_logger(__name__)
 
 router = APIRouter(prefix="/user", tags=["user"])
 
