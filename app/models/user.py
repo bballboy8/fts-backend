@@ -66,10 +66,6 @@ async def check_user_exists(email):
         await conn.close()
 
 
-import asyncpg
-from fastapi import HTTPException
-
-
 async def get_user(email):
     conn = await asyncpg.connect(**db_params)
 

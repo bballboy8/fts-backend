@@ -22,7 +22,7 @@ router = APIRouter(prefix="/user", tags=["user"])
 
 @router.post("/exist_email")
 async def email_existence(request: UserLogout):
-    return check_user_exists(request.email)
+    return {"exist": check_user_exists(request.email)}
 
 
 @router.post("/signup/")
