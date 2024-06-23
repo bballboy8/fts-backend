@@ -7,7 +7,7 @@
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
-      "cwd": "C:\\Users\\imrea\\OneDrive\\Desktop\\be",
+      "cwd": "C:\\Users\\imrea\\OneDrive\\Desktop\\fts-backend",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
       }

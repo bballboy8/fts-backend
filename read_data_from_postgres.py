@@ -19,7 +19,10 @@ start_time = time.time()
 
 # Fetch records using a server-side cursor
 with conn.cursor() as cursor:
-    cursor.execute("SELECT * FROM stock_data limit 4")
+    # cursor.execute("TRUNCATE stock_data")
+    # cursor.execute("ALTER TABLE stock_data DROP CONSTRAINT IF EXISTS stock_data_pkey;")
+    # cursor.execute("ALTER TABLE stock_data ADD PRIMARY KEY (trackingID);")
+    cursor.execute("select * from stock_data limit 5")
     records = cursor.fetchall()  # Fetch all the records
     print(records)
 

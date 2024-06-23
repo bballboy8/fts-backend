@@ -1,5 +1,5 @@
 import logging
-import os
+from app.main import db_params
 import dotenv
 import asyncpg
 import asyncio
@@ -10,23 +10,9 @@ dotenv.load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-db_params = {
-    "dbname": os.getenv("dbname"),
-    "user": os.getenv("user"),
-    "password": os.getenv("password"),
-    "host": os.getenv("host"),
-    "port": "5432",
-}
-
 
 async def fetch_all_data(symbol=None, start_datetime=None):
-    conn = await asyncpg.connect(
-        database=db_params["dbname"],
-        user=db_params["user"],
-        password=db_params["password"],
-        host=db_params["host"],
-        port=db_params["port"],
-    )
+    conn = await asyncpg.connect(**db_params)
 
     # Convert start_datetime to a datetime object if provided
     if start_datetime:
