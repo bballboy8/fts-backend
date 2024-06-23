@@ -20,19 +20,5 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests
-        # env:
-        #   OPENAI_API_KEY: "mock_openai_api_key"
-        #   SERP_API_KEY: "mock_serp_api_key"
-        #   BROWSERLESS_API_KEY: "mock_browserless_api_key"
-        #   PROD_DATABASE_URL: "mock_prod_database_url"
-        #   AUTH0_SECRET: "mock_auth0_secret"
-        #   AUTH0_TENANT_URL: "https://dev-ojaxicsls27owq3l.us.auth0.com"
-        #   AUTH0_ISSUER_BASE_URL: "https://dev-ojaxicsls27owq3l.us.auth0.com"
-        #   AUTH0_AUDIENCE: "mock_auth0_audience"
-        #   BIG_COMMERCE_BATCH_CRAWLER_JOB_DEFINITION: "mock_big_commerce_batch_crawler_job_definition"
-        #   BIG_COMMERCE_BATCH_INDEXER_JOB_DEFINITION: "mock_big_commerce_batch_indexer_job_definition"
-        #   BIG_COMMERCE_BATCH_QUEUE_NAME: "mock_big_commerce_batch_queue_name"
-        #   ERROR_NOTIFICATION_ARN: "mock_error_notification_arn"
-        #   WIDGET_SEARCH_COLLECTTION_NAME: "enterprise-search-qna-v1"
         run: |
           python -m pytest app/tests/
