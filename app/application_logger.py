@@ -23,7 +23,7 @@ class PostgresHandler(logging.Handler):
 
 
 # Initialize logger
-def init_logger(logger_name="my_app_logger"):
+def get_logger(logger_name="my_app_logger"):
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.INFO)
 

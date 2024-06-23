@@ -1,11 +1,10 @@
 import jwt
-import pytest
 
 
 class TestVerifyToken:
     # valid token returns correct payload
     def test_valid_token_returns_correct_payload(self, mocker):
-        from app.auth.authentication import verify_token, SECRET_KEY, ALGORITHM
+        from app.auth.authentication import verify_token
 
         mocker.patch("app.auth.authentication.SECRET_KEY", "test_secret")
         mocker.patch("app.auth.authentication.ALGORITHM", "HS256")
@@ -18,7 +17,7 @@ class TestVerifyToken:
 
     # token with invalid signature returns None
     def test_token_with_invalid_signature_returns_none(self, mocker):
-        from app.auth.authentication import verify_token, SECRET_KEY, ALGORITHM
+        from app.auth.authentication import verify_token
 
         mocker.patch("app.auth.authentication.SECRET_KEY", "test_secret")
         mocker.patch("app.auth.authentication.ALGORITHM", "HS256")

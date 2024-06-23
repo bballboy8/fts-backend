@@ -8,15 +8,14 @@ from app.models.nasdaq import fetch_all_data
 from fastapi import WebSocket, WebSocketDisconnect
 from concurrent.futures import Future
 from threading import Thread
-from application_logger import init_logger
+from application_logger import get_logger
 from ncdssdk import NCDSClient
 import pytz
 import asyncio
 import os
-import logging
 from datetime import timedelta, datetime
 
-logger = init_logger(__name__)
+logger = get_logger(__name__)
 router = APIRouter(prefix="/nasdaq", tags=["nasdaq"])
 
 utc_datetime = datetime.utcnow()
@@ -161,7 +160,7 @@ def init_nasdaq_kafka_connection():
     ncds_client = NCDSClient(security_cfg, kafka_cfg)
     topic = "NLSUTP"
     consumer = ncds_client.ncds_kafka_consumer(topic)
-    logging.info(f"Success to connect NASDAQ Kafka server.")
+    logger.info("Success to connect NASDAQ Kafka server.")
     return consumer
     # print(messages)
 
@@ -177,7 +176,7 @@ async def listen_message_from_nasdaq_kafka(consumer):
                 try:
                     await webSocket.send_json(response)
                 except Exception as e:
-                    logging.error(f"Error occured while sending data to client: {e}")
+                    logger.error(f"Error occured while sending data to client: {e}")
 
 
 consumer = init_nasdaq_kafka_connection()

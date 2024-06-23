@@ -1,15 +1,14 @@
-import logging
 from app.main import db_params
 import dotenv
 import asyncpg
 import asyncio
 from datetime import datetime
 
-from application_logger import init_logger
+from application_logger import get_logger
 
 dotenv.load_dotenv()
 
-logger = init_logger(__name__)
+logger = get_logger(__name__)
 
 
 async def fetch_all_data(symbol=None, start_datetime=None):

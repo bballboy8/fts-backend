@@ -2,8 +2,9 @@ import os
 import aioboto3
 import asyncio
 import psycopg2
-import logging
 from tqdm import tqdm
+
+from application_logger import get_logger
 
 # Database connection parameters
 db_params = {
@@ -17,10 +18,7 @@ db_params = {
 # DynamoDB table name
 table_name = "NASDAQ2"
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logger = get_logger(__name__)
 
 
 # Function to insert a batch of records into the database
@@ -55,7 +53,7 @@ def insert_batch(batch):
         cursor.close()
         conn.close()
     except Exception as e:
-        logging.error(f"Error inserting batch: {e}")
+        logger.error(f"Error inserting batch: {e}")
 
 
 # Asynchronous function to fetch data from DynamoDB and insert into PostgreSQL in batches
@@ -110,4 +108,4 @@ if __name__ == "__main__":
     # Start the asynchronous fetching and inserting process
     asyncio.run(fetch_and_insert())
 
-    logging.info("All batches have been inserted.")
+    logger.info("All batches have been inserted.")

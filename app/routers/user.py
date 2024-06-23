@@ -10,11 +10,9 @@ from app.schemas.user import (
     UserLogout,
 )
 
-import logging
+from application_logger import get_logger
 
-from application_logger import init_logger
-
-logger = init_logger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -47,7 +45,7 @@ async def signup(user_in: UserSignUp):
 
     try:
         await save_user(user_data)
-        logging.info(f"User {user_in.user_id} signed up successfully")
+        logger.info(f"User {user_in.user_id} signed up successfully")
         return JSONResponse(
             content={"message": "User signed up successfully"}, status_code=201
         )
@@ -62,11 +60,11 @@ async def login(user_login: UserLogin):
 
     # check if password is correct (done on frontend for now)
     if not user:
-        logging.error(f"User {user_login.email} not found")
+        logger.error(f"User {user_login.email} not found")
         raise HTTPException(status_code=400, detail="User not found")
 
     if not verify_password(user_login.password, user["hashed_password"]):
-        logging.error(f"User {user_login.email} incorrect password")
+        logger.error(f"User {user_login.email} incorrect password")
         raise HTTPException(status_code=400, detail="Incorrect Password")
 
     access_token = create_access_token(data={"sub": user_login.email})
@@ -78,9 +76,9 @@ async def login(user_login: UserLogin):
 async def update_settings(request: UpdateUserSettingsRequest):
     try:
         update_user_settings(request.email, request.settings)
-        logging.info(f"User {request.email} settings updated")
+        logger.info(f"User {request.email} settings updated")
     except Exception as e:
-        logging.error(f"Error updating user {request.email} settings: {str(e)}")
+        logger.error(f"Error updating user {request.email} settings: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
     return {"message": "User settings updated"}
@@ -92,7 +90,7 @@ async def logout(request: UserLogout):
     user = get_user(request.email)
 
     if not user:
-        logging.error(f"User {request.email} not found to logout")
+        logger.error(f"User {request.email} not found to logout")
         raise HTTPException(status_code=400, detail="User not found")
 
     return {"message": f"{request.email} logged out successfully"}

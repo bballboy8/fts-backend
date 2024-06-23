@@ -1,6 +1,5 @@
 # routes/example_route.py
 from fastapi import APIRouter
-from ..services.dynamodb_service import get_item
 
 router = APIRouter()
 
