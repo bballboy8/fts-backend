@@ -1,5 +1,8 @@
+import gzip
+from io import BytesIO
 from typing import Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from app.schemas.nasdaq import Nasdaq
 from app.models.nasdaq import fetch_all_data
 from fastapi import WebSocket, WebSocketDisconnect
@@ -100,9 +103,26 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 @router.post("/get_data")
-async def get_nasdaq_data_by_date(request: Optional[Nasdaq]):
+async def get_nasdaq_data(request: Optional[Nasdaq]):
+    if not request:
+        raise HTTPException(status_code=400, detail="Invalid request")
+
     records = await fetch_all_data(request.symbol, request.start_datetime)
-    return records
+    if not records:
+        raise HTTPException(status_code=404, detail="No data found")
+
+    buffer = BytesIO()
+    with gzip.GzipFile(fileobj=buffer, mode="w") as f:
+        f.write(records.encode("utf-8"))
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": f"attachment; filename={request.symbol}_data.gz"
+        },
+    )
 
 
 def makeRespFromKafkaMessages(messages):
