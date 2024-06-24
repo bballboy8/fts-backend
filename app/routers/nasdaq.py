@@ -111,7 +111,7 @@ def makeRespFromKafkaMessages(messages):
             (
                 [
                     int(msg["trackingID"]),
-                    convert_tracking_id_to_timestamp(str(msg["trackingID"])),
+                    str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
                     msg["msgType"],
                     msg["symbol"] if "symbol" in msg else "",
                     int(msg["price"]) if "price" in msg else -1,
