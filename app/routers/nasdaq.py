@@ -76,7 +76,9 @@ class WebSocketManager:
                 self.active_connections.remove(connection)
                 break
 
+
 manager = WebSocketManager()
+
 
 @router.websocket("/get_real_data")
 async def websocket_endpoint(websocket: WebSocket):
@@ -90,7 +92,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 manager.stopStream(websocket)
             await manager.send_personal_message(f"Received:{data}", websocket)
     except WebSocketDisconnect:
-        print('disconnected')
+        print("disconnected")
         manager.disconnect(websocket)
         # await manager.send_personal_message("Bye!!!", websocket)
 
@@ -105,20 +107,42 @@ def makeRespFromKafkaMessages(messages):
     resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
     for message in messages:
         msg = message.value()
-        trackingID = int(msg["trackingID"])
-        message_time = midnight_time + timedelta(milliseconds=trackingID / 1000000)
         resp["data"].append(
             (
                 [
                     int(msg["trackingID"]),
-                    message_time.strftime("%Y-%m-%d"),
+                    convert_tracking_id_to_timestamp(str(msg["trackingID"])),
                     msg["msgType"],
-                    msg["symbol"] if 'symbol' in msg else '',
+                    msg["symbol"] if "symbol" in msg else "",
                     int(msg["price"]) if "price" in msg else -1,
                 ]
             )
         )
     return resp
+
+
+def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
+    # Ensure the tracking ID is a string of digits
+    if not tracking_id.isdigit() or len(tracking_id) != 14:
+        raise ValueError("Invalid tracking ID format")
+
+    # Extract bytes 2-7, which represent the timestamp (6 bytes in this case)
+    timestamp_bytes = tracking_id[:]
+
+    # Convert the extracted bytes to an integer representing nanoseconds from midnight
+    nanoseconds_from_midnight = int(timestamp_bytes)
+
+    # Calculate the time of day from the nanoseconds
+    seconds_from_midnight = nanoseconds_from_midnight / 1e9
+    time_of_day = timedelta(seconds=seconds_from_midnight)
+
+    # Assume the date is today for simplicity, adjust as needed
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Add the time of day to the current date
+    timestamp = today + time_of_day
+
+    return timestamp
 
 
 def init_nasdaq_kafka_connection():
@@ -150,12 +174,14 @@ async def listen_message_from_nasdaq_kafka(consumer):
         for idx, connection in enumerate(manager.active_connections):
             if connection["isRunning"]:
                 webSocket = connection["socket"]
-                try :
+                try:
                     await webSocket.send_json(response)
                 except Exception as e:
                     logging.error(f"Error occured while sending data to client: {e}")
 
+
 consumer = init_nasdaq_kafka_connection()
+
 
 def between_callback():
     loop = asyncio.new_event_loop()
