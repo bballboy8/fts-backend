@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from app.services.dynamodb_service import DynamoDBService
-from application_logger import get_logger
+from app.application_logger import get_logger
 
 
 logger = get_logger(__name__)

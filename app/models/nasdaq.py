@@ -1,11 +1,10 @@
-import logging
 import os
 import dotenv
 import asyncpg
 import asyncio
 from datetime import datetime
 
-from application_logger import get_logger
+from app.application_logger import get_logger
 
 dotenv.load_dotenv()
 
