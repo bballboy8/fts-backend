@@ -1,7 +1,8 @@
 import logging
-import logging.handlers
 import os
 import asyncpg
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
@@ -19,15 +20,25 @@ class PostgresHandler(logging.Handler):
     def __init__(self, db_params):
         logging.Handler.__init__(self)
         self.db_params = db_params
+        self.loop = asyncio.get_event_loop()
+        self.executor = ThreadPoolExecutor(max_workers=1)
 
-    async def emit(self, record):
+    def emit(self, record):
         log_entry = self.format(record)
+        self.loop.run_in_executor(
+            self.executor, self._write_log, record.levelname, log_entry
+        )
+
+    def _write_log(self, levelname, log_entry):
+        asyncio.run(self._async_write_log(levelname, log_entry))
+
+    async def _async_write_log(self, levelname, log_entry):
         conn = await asyncpg.connect(**self.db_params)
         query = """
             INSERT INTO logs (log_level, log_message, log_time)
             VALUES ($1, $2, $3)
         """
-        await conn.execute(query, record.levelname, log_entry, datetime.utcnow())
+        await conn.execute(query, levelname, log_entry, datetime.utcnow())
         await conn.close()
 
 
@@ -53,3 +64,9 @@ def get_logger(logger_name="my_app_logger"):
     logger.addHandler(pg_handler)
 
     return logger
+
+
+# Example usage
+if __name__ == "__main__":
+    logger = get_logger()
+    logger.info("This is an info log message.")
