@@ -30,7 +30,7 @@ async def fetch_all_data(symbol=None, start_datetime=None):
 
     # Convert start_datetime to a datetime object if provided
     if start_datetime:
-        start_datetime = datetime.strptime(start_datetime, "%Y-%m-%d %H:%M:%S")
+        start_datetime = datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
 
     # Base query
     query = "SELECT * FROM stock_data where msgType = 'T'"
