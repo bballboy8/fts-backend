@@ -5,7 +5,7 @@ from app.models.nasdaq import fetch_all_data
 from fastapi import WebSocket, WebSocketDisconnect
 from concurrent.futures import Future
 from threading import Thread
-from application_logger import get_logger
+from app.application_logger import get_logger
 from ncdssdk import NCDSClient
 import pytz, asyncio, os, logging
 from datetime import timedelta, datetime

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 from botocore.config import Config
 
-from application_logger import get_logger
+from app.application_logger import get_logger
 
 # create a logging instance
 logger = get_logger(__name__)
