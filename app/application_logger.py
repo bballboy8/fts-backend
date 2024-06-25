@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 db_params = {
-    "dbname": os.getenv("dbname"),
+    "database": os.getenv("dbname"),
     "user": os.getenv("user"),
     "password": os.getenv("password"),
     "host": os.getenv("host"),
