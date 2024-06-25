@@ -1,7 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter
 from app.schemas.nasdaq import Nasdaq
-from app.models.nasdaq import fetch_all_data
+from app.models.nasdaq import fetch_all_data, fetch_all_tickers
 from fastapi import WebSocket, WebSocketDisconnect
 from concurrent.futures import Future
 from threading import Thread
@@ -101,6 +101,12 @@ async def websocket_endpoint(websocket: WebSocket):
 @router.post("/get_data")
 async def get_nasdaq_data_by_date(request: Optional[Nasdaq]):
     records = await fetch_all_data(request.symbol, request.start_datetime)
+    return records
+
+
+@router.get("/get_tickers")
+async def get_tickers():
+    records = await fetch_all_tickers()
     return records
 
 
