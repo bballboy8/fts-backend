@@ -5,10 +5,11 @@ import asyncpg
 import asyncio
 from datetime import datetime
 
+from application_logger import get_logger
+
 dotenv.load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 db_params = {
     "dbname": os.getenv("dbname"),
@@ -55,7 +56,7 @@ async def fetch_all_data(symbol=None, start_datetime=None):
         # Execute the query with the values
         records = await conn.fetch(query, *values)
     except Exception as e:
-        logger.error(f"Error executing query: {e}")
+        logger.error(f"Error executing query: {e}", exc_info=True)
         raise
     finally:
         await conn.close()

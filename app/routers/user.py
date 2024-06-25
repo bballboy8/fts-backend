@@ -3,27 +3,31 @@ from fastapi.responses import JSONResponse
 from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
 from app.models.user import save_user, get_user, update_user_settings
-from app.schemas.user import UserSignUp, UserLogin, UpdateUserSettingsRequest, UserLogout
-
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-router = APIRouter(
-    prefix="/user",
-    tags=["user"]
+from app.schemas.user import (
+    UserSignUp,
+    UserLogin,
+    UpdateUserSettingsRequest,
+    UserLogout,
 )
 
+from application_logger import get_logger
+
+logger = get_logger(__name__)
+
+
+router = APIRouter(prefix="/user", tags=["user"])
+
+
 @router.post("/exist_email")
-async def email_existence(request : UserLogout) :
+async def email_existence(request: UserLogout):
     user = get_user(request.email)
-    
+
     if not user:
-        logging.error(f"User {request.email} not exist on the database")
+        logger.error(f"User {request.email} not exist on the database", exc_info=True)
         return {"exist": False}
-        
+
     return {"exist": True}
+
 
 @router.post("/signup/")
 async def signup(user_in: UserSignUp):
@@ -45,54 +49,58 @@ async def signup(user_in: UserSignUp):
         "country": user_in.country,
         "trading_experience": user_in.trading_experience.model_dump(),
     }
-    
+
     try:
         save_user(user_data)
-        logging.info(f"User {user_in.user_id} signed up successfully")
-        return JSONResponse(content={"message": "User signed up successfully"}, status_code=201)
-        
+        logger.info(f"User {user_in.user_id} signed up successfully")
+        return JSONResponse(
+            content={"message": "User signed up successfully"}, status_code=201
+        )
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
+
 @router.post("/login/")
 async def login(user_login: UserLogin):
-    
     # check if user is in database (simple for now)
     user = get_user(user_login.email)
-        
+
     # check if password is correct (done on frontend for now)
     if not user:
-        logging.error(f"User {user_login.email} not found")
+        logger.error(f"User {user_login.email} not found", exc_info=True)
         raise HTTPException(status_code=400, detail="User not found")
-    
-    if not verify_password(user_login.password, user['hashed_password']):
-        logging.error(f"User {user_login.email} incorrect password")
+
+    if not verify_password(user_login.password, user["hashed_password"]):
+        logger.error(f"User {user_login.email} incorrect password", exc_info=True)
         raise HTTPException(status_code=400, detail="Incorrect Password")
-    
+
     access_token = create_access_token(data={"sub": user_login.email})
     message = f"User {user_login.email} logged in successfully"
     return {"access_token": access_token, "token_type": "bearer", "message": message}
 
+
 @router.post("/settings/")
 async def update_settings(request: UpdateUserSettingsRequest):
-    
     try:
         update_user_settings(request.email, request.settings)
-        logging.info(f"User {request.email} settings updated")
+        logger.info(f"User {request.email} settings updated")
     except Exception as e:
-        logging.error(f"Error updating user {request.email} settings: {str(e)}")
+        logger.error(
+            f"Error updating user {request.email} settings: {str(e)}", exc_info=True
+        )
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     return {"message": "User settings updated"}
+
 
 @router.post("/logout/")
 async def logout(request: UserLogout):
-    
     # check if user is in database (simple for now)
     user = get_user(request.email)
-    
+
     if not user:
-        logging.error(f"User {request.email} not found to logout")
+        logger.error(f"User {request.email} not found to logout", exc_info=True)
         raise HTTPException(status_code=400, detail="User not found")
-        
+
     return {"message": f"{request.email} logged out successfully"}
