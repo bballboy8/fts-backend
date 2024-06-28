@@ -2,12 +2,12 @@ from typing import Optional
 from fastapi import APIRouter
 from app.schemas.nasdaq import Nasdaq
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from concurrent.futures import Future
 from threading import Thread
 from app.application_logger import get_logger
 from ncdssdk import NCDSClient
-import pytz, asyncio, os, logging
+import pytz, asyncio, os
 from datetime import timedelta, datetime
 
 logger = get_logger(__name__)
@@ -110,22 +110,22 @@ async def get_tickers():
     return records
 
 
-def makeRespFromKafkaMessages(messages):
-    resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
-    for message in messages:
-        msg = message.value()
-        resp["data"].append(
-            (
-                [
-                    int(msg["trackingID"]),
-                    str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
-                    msg["msgType"],
-                    msg["symbol"] if "symbol" in msg else "",
-                    int(msg["price"]) if "price" in msg else -1,
-                ]
-            )
-        )
-    return resp
+# def makeRespFromKafkaMessages(messages):
+#     resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
+#     for message in messages:
+#         msg = message.value()
+#         resp["data"].append(
+#             (
+#                 [
+#                     int(msg["trackingID"]),
+#                     str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
+#                     msg["msgType"],
+#                     msg["symbol"] if "symbol" in msg else "",
+#                     int(msg["price"]) if "price" in msg else -1,
+#                 ]
+#             )
+#         )
+#     return resp
 
 
 def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
@@ -152,54 +152,54 @@ def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
     return timestamp
 
 
-def init_nasdaq_kafka_connection():
-    print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
-    security_cfg = {
-        "oauth.token.endpoint.uri": os.getenv("NASDAQ_KAFKA_ENDPOINT"),
-        "oauth.client.id": os.getenv("NASDAQ_KAFKA_CLIENT_ID"),
-        "oauth.client.secret": os.getenv("NASDAQ_KAFKA_CLIENT_SECRET"),
-    }
-    kafka_cfg = {
-        "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
-        # "bootstrap.servers": "{streams_endpoint_url}:9094",
-        "auto.offset.reset": "latest",
-    }
+# def init_nasdaq_kafka_connection():
+#     print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
+#     security_cfg = {
+#         "oauth.token.endpoint.uri": os.getenv("NASDAQ_KAFKA_ENDPOINT"),
+#         "oauth.client.id": os.getenv("NASDAQ_KAFKA_CLIENT_ID"),
+#         "oauth.client.secret": os.getenv("NASDAQ_KAFKA_CLIENT_SECRET"),
+#     }
+#     kafka_cfg = {
+#         "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
+#         # "bootstrap.servers": "{streams_endpoint_url}:9094",
+#         "auto.offset.reset": "latest",
+#     }
 
-    ncds_client = NCDSClient(security_cfg, kafka_cfg)
-    topic = "NLSUTP"
-    consumer = ncds_client.ncds_kafka_consumer(topic)
-    logger.info(f"Success to connect NASDAQ Kafka server.")
-    return consumer
-    # print(messages)
-
-
-async def listen_message_from_nasdaq_kafka(consumer):
-    while True:
-        messages = consumer.consume(num_messages=2000, timeout=10)
-        response = makeRespFromKafkaMessages(messages)
-        # print(len(manager.active_connections))
-        for idx, connection in enumerate(manager.active_connections):
-            if connection["isRunning"]:
-                webSocket = connection["socket"]
-                try:
-                    await webSocket.send_json(response)
-                except Exception as e:
-                    logger.error(
-                        f"Error occured while sending data to client: {e}",
-                        exc_info=True,
-                    )
+#     ncds_client = NCDSClient(security_cfg, kafka_cfg)
+#     topic = "NLSUTP"
+#     consumer = ncds_client.ncds_kafka_consumer(topic)
+#     logger.info(f"Success to connect NASDAQ Kafka server.")
+#     return consumer
+#     # print(messages)
 
 
-consumer = init_nasdaq_kafka_connection()
+# async def listen_message_from_nasdaq_kafka(consumer):
+#     while True:
+#         messages = consumer.consume(num_messages=2000, timeout=10)
+#         response = makeRespFromKafkaMessages(messages)
+#         # print(len(manager.active_connections))
+#         for idx, connection in enumerate(manager.active_connections):
+#             if connection["isRunning"]:
+#                 webSocket = connection["socket"]
+#                 try:
+#                     await webSocket.send_json(response)
+#                 except Exception as e:
+#                     logger.error(
+#                         f"Error occured while sending data to client: {e}",
+#                         exc_info=True,
+#                     )
 
 
-def between_callback():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    loop.run_until_complete(listen_message_from_nasdaq_kafka(consumer))
-    loop.close()
+# consumer = init_nasdaq_kafka_connection()
 
 
-nasdaq_kafka_thread = Thread(target=between_callback)
-nasdaq_kafka_thread.start()
+# def between_callback():
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+
+#     loop.run_until_complete(listen_message_from_nasdaq_kafka(consumer))
+#     loop.close()
+
+
+# nasdaq_kafka_thread = Thread(target=between_callback)
+# nasdaq_kafka_thread.start()
