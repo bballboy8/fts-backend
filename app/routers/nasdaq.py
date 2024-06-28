@@ -78,24 +78,24 @@ class WebSocketManager:
                 break
 
 
-manager = WebSocketManager()
+# manager = WebSocketManager()
 
 
-@router.websocket("/get_real_data")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            if data == "start":
-                manager.startStream(websocket)
-            elif data == "stop":
-                manager.stopStream(websocket)
-            await manager.send_personal_message(f"Received:{data}", websocket)
-    except WebSocketDisconnect:
-        print("disconnected")
-        manager.disconnect(websocket)
-        # await manager.send_personal_message("Bye!!!", websocket)
+# @router.websocket("/get_real_data")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await manager.connect(websocket)
+#     try:
+#         while True:
+#             data = await websocket.receive_text()
+#             if data == "start":
+#                 manager.startStream(websocket)
+#             elif data == "stop":
+#                 manager.stopStream(websocket)
+#             await manager.send_personal_message(f"Received:{data}", websocket)
+#     except WebSocketDisconnect:
+#         print("disconnected")
+#         manager.disconnect(websocket)
+#         # await manager.send_personal_message("Bye!!!", websocket)
 
 
 @router.post("/get_data")
