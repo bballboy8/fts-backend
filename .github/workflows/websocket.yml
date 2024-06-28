@@ -1,0 +1,27 @@
+name: Deploy to AWS Websocket
+
+on:
+  push:
+    branches:
+      - no-websocket
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up SSH connection
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: ${{ secrets.SSH_WEBSOCKET }}
+
+    - name: Change directory and pull repository
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME_WEBSOCKET }}@${{ secrets.HOST_WEBSOCKET }} 'cd /home/ubuntu/fts-backend && git pull origin no-websocket || (echo "Error encountered during git pull. Stashing changes before retrying." && git stash && git pull origin no-websocket)'
+        
+      
+    - name: SERVER and Logs
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME_WEBSOCKET }}@${{ secrets.HOST_WEBSOCKET }} 'cd /home/ubuntu/fts-backend && source venv/bin/activate && pm2 list && pm2 restart 0 && (setsid pm2 logs 0 &) && sleep 5 && pkill -f "pm2 logs 0"'
