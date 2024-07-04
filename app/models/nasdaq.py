@@ -1,10 +1,10 @@
-from app.main import db_params
+from app.utils import db_params
 import dotenv
 import asyncpg
 import asyncio
 from datetime import datetime
 
-from application_logger import get_logger
+from app.application_logger import get_logger
 
 dotenv.load_dotenv()
 
@@ -12,7 +12,11 @@ logger = get_logger(__name__)
 
 
 async def fetch_all_data(symbol=None, start_datetime=None):
-    conn = await asyncpg.connect(**db_params)
+
+    db_params_cpy = db_params.copy()
+    db_params_cpy.pop("dbname", '')
+
+    conn = await asyncpg.connect(**db_params_cpy)
 
     # Convert start_datetime to a datetime object if provided
     if start_datetime:

@@ -1,9 +1,10 @@
 import asyncpg
+from app.utils import db_params
 from fastapi import HTTPException
-from app.main import db_params
-from application_logger import get_logger
+from app.application_logger import get_logger
 
 logger = get_logger(__name__)
+
 
 
 async def save_user(user_data):

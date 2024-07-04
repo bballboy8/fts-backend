@@ -8,11 +8,12 @@ from app.models.nasdaq import fetch_all_data
 from fastapi import WebSocket, WebSocketDisconnect
 from concurrent.futures import Future
 from threading import Thread
-from application_logger import get_logger
+from app.application_logger import get_logger
 from ncdssdk import NCDSClient
 import pytz
 import asyncio
 import os
+import json
 from datetime import timedelta, datetime
 
 logger = get_logger(__name__)
@@ -25,6 +26,12 @@ desired_timezone = pytz.timezone("America/New_York")
 localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(desired_timezone)
 midnight_time = datetime.combine(localized_datetime, datetime.min.time())
 
+def record_to_dict(record):
+    """Convert asyncpg.Record to a dictionary, serializing datetime objects to strings."""
+    return {
+        key: (value.isoformat() if isinstance(value, datetime) else value)
+        for key, value in dict(record).items()
+    }
 
 def call_with_future(fn, future, args, kwargs):
     try:
@@ -110,9 +117,11 @@ async def get_nasdaq_data(request: Optional[Nasdaq]):
     if not records:
         raise HTTPException(status_code=404, detail="No data found")
 
+    records_str = "\n".join([json.dumps(record_to_dict(record)) for record in records])
+
     buffer = BytesIO()
     with gzip.GzipFile(fileobj=buffer, mode="w") as f:
-        f.write(records.encode("utf-8"))
+        f.write(records_str.encode("utf-8"))
 
     buffer.seek(0)
     return StreamingResponse(

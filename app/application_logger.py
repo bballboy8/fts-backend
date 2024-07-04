@@ -2,7 +2,7 @@ import logging
 import logging.handlers
 import asyncpg
 from datetime import datetime
-from app.main import db_params
+from app.utils import db_params
 
 
 # Custom logging handler to log to PostgreSQL

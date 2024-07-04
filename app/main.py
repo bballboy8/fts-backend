@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.routers import user
 from app.routers import nasdaq
 from app.services.dynamodb_service import create_dynamodb_tables
-
+from app.utils import db_params
 import logging
 
 logging.basicConfig(
@@ -15,13 +15,7 @@ app = FastAPI()
 app.include_router(user.router)
 app.include_router(nasdaq.router)
 
-db_params = {
-    "dbname": os.getenv("dbname"),
-    "user": os.getenv("user"),
-    "password": os.getenv("password"),
-    "host": os.getenv("host"),
-    "port": "5432",
-}
+
 
 
 @app.on_event("startup")
