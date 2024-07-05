@@ -59,7 +59,7 @@ async def check_user_exists(email):
         logger.info("Checked if user exists")
         return len(result) > 0
     except Exception as e:
-        logger.error(f"Error checking if user exists: {e}")
+        logger.error(f"Error checking if user exists: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await conn.close()
@@ -84,7 +84,7 @@ async def get_user(email):
         else:
             raise HTTPException(status_code=404, detail="User not found")
     except Exception as e:
-        logger.error(f"Error retrieving user: {e}")
+        logger.error(f"Error retrieving user: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await conn.close()
@@ -109,7 +109,7 @@ async def update_user_settings(email, settings):
         )
         logger.info("User settings updated successfully")
     except Exception as e:
-        logger.error(f"Error updating user settings: {e}")
+        logger.error(f"Error updating user settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await conn.close()
@@ -132,7 +132,7 @@ async def get_user_settings(email):
         else:
             raise HTTPException(status_code=404, detail="User settings not found")
     except Exception as e:
-        logger.error(f"Error retrieving user settings: {e}")
+        logger.error(f"Error retrieving user settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await conn.close()

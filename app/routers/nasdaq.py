@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from app.schemas.nasdaq import Nasdaq
-from app.models.nasdaq import fetch_all_data
+from app.models.nasdaq import fetch_all_data, fetch_all_tickers
 from fastapi import WebSocket, WebSocketDisconnect
 from concurrent.futures import Future
 from threading import Thread
@@ -133,17 +133,21 @@ async def get_nasdaq_data(request: Optional[Nasdaq]):
     )
 
 
+@router.get("/get_tickers")
+async def get_tickers():
+    records = await fetch_all_tickers()
+    return records
+
+
 def makeRespFromKafkaMessages(messages):
     resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
     for message in messages:
         msg = message.value()
-        trackingID = int(msg["trackingID"])
-        message_time = midnight_time + timedelta(milliseconds=trackingID / 1000000)
         resp["data"].append(
             (
                 [
                     int(msg["trackingID"]),
-                    message_time.strftime("%Y-%m-%d"),
+                    str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
                     msg["msgType"],
                     msg["symbol"] if "symbol" in msg else "",
                     int(msg["price"]) if "price" in msg else -1,
@@ -151,6 +155,30 @@ def makeRespFromKafkaMessages(messages):
             )
         )
     return resp
+
+
+def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
+    # Ensure the tracking ID is a string of digits
+    if not tracking_id.isdigit() or len(tracking_id) != 14:
+        raise ValueError("Invalid tracking ID format")
+
+    # Extract bytes 2-7, which represent the timestamp (6 bytes in this case)
+    timestamp_bytes = tracking_id[:]
+
+    # Convert the extracted bytes to an integer representing nanoseconds from midnight
+    nanoseconds_from_midnight = int(timestamp_bytes)
+
+    # Calculate the time of day from the nanoseconds
+    seconds_from_midnight = nanoseconds_from_midnight / 1e9
+    time_of_day = timedelta(seconds=seconds_from_midnight)
+
+    # Assume the date is today for simplicity, adjust as needed
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Add the time of day to the current date
+    timestamp = today + time_of_day
+
+    return timestamp
 
 
 def init_nasdaq_kafka_connection():
@@ -185,7 +213,10 @@ async def listen_message_from_nasdaq_kafka(consumer):
                 try:
                     await webSocket.send_json(response)
                 except Exception as e:
-                    logger.error(f"Error occured while sending data to client: {e}")
+                    logger.error(
+                        f"Error occured while sending data to client: {e}",
+                        exc_info=True,
+                    )
 
 
 consumer = init_nasdaq_kafka_connection()

@@ -22,6 +22,7 @@ async def email_existence(request: UserLogout):
     return {"exist": check_user_exists(request.email)}
 
 
+
 @router.post("/signup/")
 async def signup(user_in: UserSignUp):
     hashed_password = get_password_hash(user_in.password)
