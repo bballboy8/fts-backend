@@ -1,8 +1,7 @@
 from typing import Optional
-from fastapi import APIRouter
 from app.schemas.nasdaq import Nasdaq
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from concurrent.futures import Future
 from threading import Thread
 from app.application_logger import get_logger
@@ -12,7 +11,6 @@ from datetime import timedelta, datetime
 
 logger = get_logger(__name__)
 
-
 router = APIRouter(prefix="/nasdaq", tags=["nasdaq"])
 
 utc_datetime = datetime.utcnow()
@@ -21,23 +19,6 @@ desired_timezone = pytz.timezone("America/New_York")
 # Convert the UTC time to the desired timezone
 localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(desired_timezone)
 midnight_time = datetime.combine(localized_datetime, datetime.min.time())
-
-
-def call_with_future(fn, future, args, kwargs):
-    try:
-        result = fn(*args, **kwargs)
-        future.set_result(result)
-    except Exception as exc:
-        future.set_exception(exc)
-
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        future = Future()
-        Thread(target=call_with_future, args=(fn, future, args, kwargs)).start()
-        return future
-
-    return wrapper
 
 
 class WebSocketManager:
@@ -109,6 +90,12 @@ async def get_tickers():
     records = await fetch_all_tickers()
     return records
 
+@router.get("/get_connections")
+async def get_connections():
+    connections = []
+    for idx, connection in enumerate(manager.active_connections):
+        connections.append(connection["socket"]["client"])
+    return connections
 
 def makeRespFromKafkaMessages(messages):
     resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
@@ -161,7 +148,6 @@ def init_nasdaq_kafka_connection():
     }
     kafka_cfg = {
         "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
-        # "bootstrap.servers": "{streams_endpoint_url}:9094",
         "auto.offset.reset": "latest",
     }
 
@@ -170,14 +156,13 @@ def init_nasdaq_kafka_connection():
     consumer = ncds_client.ncds_kafka_consumer(topic)
     logger.info(f"Success to connect NASDAQ Kafka server.")
     return consumer
-    # print(messages)
 
 
 async def listen_message_from_nasdaq_kafka(consumer):
+    logger.info("Starting listening messages from nasdaq kafka!")
     while True:
         messages = consumer.consume(num_messages=2000, timeout=10)
         response = makeRespFromKafkaMessages(messages)
-        # print(len(manager.active_connections))
         for idx, connection in enumerate(manager.active_connections):
             if connection["isRunning"]:
                 webSocket = connection["socket"]
@@ -185,21 +170,25 @@ async def listen_message_from_nasdaq_kafka(consumer):
                     await webSocket.send_json(response)
                 except Exception as e:
                     logger.error(
-                        f"Error occured while sending data to client: {e}",
+                        f"Error occurred while sending data to client: {e}",
                         exc_info=True,
                     )
+                    logger.error(f"Total Connections: {len(manager.active_connections)}")
 
 
 consumer = init_nasdaq_kafka_connection()
 
 
+@router.on_event("startup")
+async def startup_event():
+    nasdaq_kafka_thread = Thread(target=between_callback)
+    nasdaq_kafka_thread.start()
+
+
 def between_callback():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-
-    loop.run_until_complete(listen_message_from_nasdaq_kafka(consumer))
-    loop.close()
-
-
-nasdaq_kafka_thread = Thread(target=between_callback)
-nasdaq_kafka_thread.start()
+    try:
+        loop.run_until_complete(listen_message_from_nasdaq_kafka(consumer))
+    finally:
+        loop.close()
