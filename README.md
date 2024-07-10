@@ -34,3 +34,4 @@ To set up a pre-commit hook to run the Ruff linter, ensure you have Python and P
 
 This will set up the pre-commit hook to run the Ruff linter before each commit, helping maintain code quality standards in your project.
 
+.
