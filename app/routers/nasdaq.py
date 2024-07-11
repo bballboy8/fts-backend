@@ -90,12 +90,14 @@ async def get_tickers():
     records = await fetch_all_tickers()
     return records
 
+
 @router.get("/get_connections")
 async def get_connections():
     connections = []
     for idx, connection in enumerate(manager.active_connections):
         connections.append(connection["socket"]["client"])
     return connections
+
 
 def makeRespFromKafkaMessages(messages):
     resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
@@ -149,6 +151,7 @@ def init_nasdaq_kafka_connection():
     kafka_cfg = {
         "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
         "auto.offset.reset": "latest",
+        "socket.keepalive.enable": True
     }
 
     ncds_client = NCDSClient(security_cfg, kafka_cfg)
@@ -158,25 +161,30 @@ def init_nasdaq_kafka_connection():
     return consumer
 
 
-async def listen_message_from_nasdaq_kafka(consumer):
+async def listen_message_from_nasdaq_kafka():
+    consumer = None
     logger.info("Starting listening messages from nasdaq kafka!")
     while True:
-        messages = consumer.consume(num_messages=2000, timeout=10)
-        response = makeRespFromKafkaMessages(messages)
-        for idx, connection in enumerate(manager.active_connections):
-            if connection["isRunning"]:
-                webSocket = connection["socket"]
-                try:
-                    await webSocket.send_json(response)
-                except Exception as e:
-                    logger.error(
-                        f"Error occurred while sending data to client: {e}",
-                        exc_info=True,
-                    )
-                    logger.error(f"Total Connections: {len(manager.active_connections)}")
-
-
-consumer = init_nasdaq_kafka_connection()
+        try:
+            if not consumer:
+                consumer = init_nasdaq_kafka_connection()
+            messages = consumer.consume(num_messages=2000, timeout=10)
+            response = makeRespFromKafkaMessages(messages)
+            for idx, connection in enumerate(manager.active_connections):
+                if connection["isRunning"]:
+                    webSocket = connection["socket"]
+                    try:
+                        await webSocket.send_json(response)
+                    except Exception as e:
+                        logger.error(
+                            f"Error occurred while sending data to client: {e}",
+                            exc_info=True,
+                        )
+                        logger.error(f"Total Connections: {len(manager.active_connections)}")
+                        consumer = None
+        except Exception as e:
+            logger.error(f"Error in consuming: {e}", exc_info=True)
+            consumer = None
 
 
 @router.on_event("startup")
@@ -189,6 +197,6 @@ def between_callback():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        loop.run_until_complete(listen_message_from_nasdaq_kafka(consumer))
+        loop.run_until_complete(listen_message_from_nasdaq_kafka())
     finally:
         loop.close()
