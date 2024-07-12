@@ -15,7 +15,7 @@ jobs:
     - name: Set up SSH connection
       uses: webfactory/ssh-agent@v0.5.3
       with:
-        ssh-private-key: ${{ secrets.SSH_KEY }}
+        ssh-private-key: ${{ secrets.SSH_NEW_WEBSOCKET }}
 
     - name: Change directory and pull repository
       run: |
