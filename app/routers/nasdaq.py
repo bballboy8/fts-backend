@@ -115,7 +115,6 @@ def makeRespFromKafkaMessages(messages):
             "size",
             "sale_condition",
             "consolidated_volume",
-            "schema_name",
         ],
         "data": [],
     }
@@ -137,7 +136,6 @@ def makeRespFromKafkaMessages(messages):
                     msg.get("size"),
                     msg.get("saleCondition"),
                     msg.get("cosolidatedVolume"),
-                    msg.get("schemaName"),
                 ]
             )
         )
@@ -178,7 +176,7 @@ def init_nasdaq_kafka_connection():
     kafka_cfg = {
         "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
         "auto.offset.reset": "latest",
-        "socket.keepalive.enable": True
+        "socket.keepalive.enable": True,
     }
 
     ncds_client = NCDSClient(security_cfg, kafka_cfg)
@@ -207,7 +205,9 @@ async def listen_message_from_nasdaq_kafka():
                             f"Error occurred while sending data to client: {e}",
                             exc_info=True,
                         )
-                        logger.error(f"Total Connections: {len(manager.active_connections)}")
+                        logger.error(
+                            f"Total Connections: {len(manager.active_connections)}"
+                        )
                         consumer = None
         except Exception as e:
             logger.error(f"Error in consuming: {e}", exc_info=True)
