@@ -111,7 +111,25 @@ async def get_tickers():
 
 
 def makeRespFromKafkaMessages(messages):
-    resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
+    resp = {
+        "headers": [
+            "trackingID",
+            "date",
+            "msgType",
+            "symbol",
+            "price",
+            "soup_partition",
+            "soup_sequence",
+            "market_center",
+            "security_class",
+            "control_number",
+            "size",
+            "sale_condition",
+            "consolidated_volume",
+            "schema_name",
+        ],
+        "data": [],
+    }
     for message in messages:
         msg = message.value()
         resp["data"].append(
@@ -122,6 +140,15 @@ def makeRespFromKafkaMessages(messages):
                     msg["msgType"],
                     msg["symbol"] if "symbol" in msg else "",
                     int(msg["price"]) if "price" in msg else -1,
+                    msg.get("SoupPartition"),
+                    msg.get("SoupSequence"),
+                    msg.get("marketCenter"),
+                    msg.get("securityClass"),
+                    msg.get("controlNumber"),
+                    msg.get("size"),
+                    msg.get("saleCondition"),
+                    msg.get("cosolidatedVolume"),
+                    msg.get("schemaName"),
                 ]
             )
         )
