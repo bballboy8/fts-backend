@@ -70,6 +70,8 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             if data == "start":
                 manager.startStream(websocket)
+                # Start the Kafka consumers when the client sends the "start" message
+                await start_kafka_consumers(websocket)
             elif data == "stop":
                 manager.stopStream(websocket)
             await manager.send_personal_message(f"Received:{data}", websocket)
@@ -166,7 +168,7 @@ def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
     return timestamp
 
 
-def init_nasdaq_kafka_connection():
+def init_nasdaq_kafka_connection(topic: str):
     print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
     security_cfg = {
         "oauth.token.endpoint.uri": os.getenv("NASDAQ_KAFKA_ENDPOINT"),
@@ -180,19 +182,14 @@ def init_nasdaq_kafka_connection():
     }
 
     ncds_client = NCDSClient(security_cfg, kafka_cfg)
-    topic = "NLSUTP"
     consumer = ncds_client.ncds_kafka_consumer(topic)
-    logger.info(f"Success to connect NASDAQ Kafka server.")
+    logger.info(f"Success to connect NASDAQ Kafka server for topic {topic}.")
     return consumer
 
 
-async def listen_message_from_nasdaq_kafka():
-    consumer = None
-    logger.info("Starting listening messages from nasdaq kafka!")
+async def consume_messages(consumer, websocket):
     while True:
         try:
-            if not consumer:
-                consumer = init_nasdaq_kafka_connection()
             messages = consumer.consume(num_messages=2000, timeout=10)
             response = makeRespFromKafkaMessages(messages)
             for idx, connection in enumerate(manager.active_connections):
@@ -208,22 +205,22 @@ async def listen_message_from_nasdaq_kafka():
                         logger.error(
                             f"Total Connections: {len(manager.active_connections)}"
                         )
-                        consumer = None
         except Exception as e:
             logger.error(f"Error in consuming: {e}", exc_info=True)
-            consumer = None
+            break
+
+
+async def start_kafka_consumers(websocket):
+    logger.info("Starting listening messages from nasdaq kafka!")
+    consumer_utp = init_nasdaq_kafka_connection("NLSUTP")
+    consumer_cta = init_nasdaq_kafka_connection("NLSCTA")
+
+    loop = asyncio.get_event_loop()
+    task_utp = loop.create_task(consume_messages(consumer_utp, websocket))
+    task_cta = loop.create_task(consume_messages(consumer_cta, websocket))
+    await asyncio.gather(task_utp, task_cta)
 
 
 @router.on_event("startup")
 async def startup_event():
-    nasdaq_kafka_thread = Thread(target=between_callback)
-    nasdaq_kafka_thread.start()
-
-
-def between_callback():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(listen_message_from_nasdaq_kafka())
-    finally:
-        loop.close()
+    pass  # No need to start consumers on startup, they will start on "start" message
