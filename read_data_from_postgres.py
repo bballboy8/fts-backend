@@ -19,7 +19,7 @@ start_time = time.time()
 
 # Fetch records using a server-side cursor
 with conn.cursor() as cursor:
-    cursor.execute("SELECT * FROM stock_data limit 4")
+    cursor.execute("SELECT * FROM stock_data_partitioned limit 4")
     records = cursor.fetchall()  # Fetch all the records
     print(records)
 

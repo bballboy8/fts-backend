@@ -48,7 +48,7 @@ def insert_batch(batch):
         )
         if args_str:
             cursor.execute(
-                "INSERT INTO stock_data (trackingID, date, msgType, symbol, price) VALUES "
+                "INSERT INTO stock_data_partitioned (trackingID, date, msgType, symbol, price) VALUES "
                 + args_str
             )
             conn.commit()
@@ -93,9 +93,9 @@ if __name__ == "__main__":
     # Connect to the database to drop the table if it exists and create a new one
     conn = psycopg2.connect(**db_params)
     cursor = conn.cursor()
-    cursor.execute("DROP TABLE IF EXISTS stock_data")
+    cursor.execute("DROP TABLE IF EXISTS stock_data_partitioned")
     cursor.execute("""
-        CREATE TABLE stock_data (
+        CREATE TABLE stock_data_partitioned (
             trackingID VARCHAR(30),
             date TIMESTAMP,
             msgType VARCHAR(20),

@@ -33,7 +33,7 @@ async def fetch_all_data(symbol=None, start_datetime=None):
         start_datetime = datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
 
     # Base query
-    query = "SELECT * FROM stock_data where msgType = 'T'"
+    query = "SELECT * FROM stock_data_partitioned where msgType = 'T'"
     conditions = []
     values = []
 
@@ -73,7 +73,7 @@ async def fetch_all_tickers():
     )
 
     # Base query
-    query = "SELECT distinct(symbol) FROM stock_data"
+    query = "SELECT distinct(symbol) FROM stock_data_partitioned"
 
     logger.info(f"Executing query: {query}")
 
