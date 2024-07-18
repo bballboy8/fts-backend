@@ -6,8 +6,7 @@ from fastapi import WebSocket
 from concurrent.futures import Future
 from threading import Thread
 from app.application_logger import get_logger
-from ncdssdk import NCDSClient
-import pytz, asyncio, os
+import pytz
 from datetime import timedelta, datetime
 
 logger = get_logger(__name__)

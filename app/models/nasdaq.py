@@ -28,12 +28,14 @@ async def fetch_all_data(symbol=None, start_datetime=None):
         port=db_params["port"],
     )
 
+    logger.info("Connected to DB")
+
     # Convert start_datetime to a datetime object if provided
     if start_datetime:
         start_datetime = datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
 
     # Base query
-    query = "SELECT * FROM stock_data where msgType = 'T'"
+    query = "SELECT date, symbol, size FROM stock_data_partitioned where msgType = 'T'"
     conditions = []
     values = []
 
