@@ -75,7 +75,7 @@ async def fetch_all_tickers():
     )
 
     # Base query
-    query = "SELECT distinct(symbol) FROM stock_data"
+    query = "SELECT distinct(symbol) FROM stock_data_partitioned"
 
     logger.info(f"Executing query: {query}")
 
