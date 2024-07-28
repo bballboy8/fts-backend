@@ -1,3 +1,5 @@
+import gzip
+import io
 import json
 import os
 from typing import Optional
@@ -120,6 +122,16 @@ def record_generator(records):
         yield json.dumps(record_dict) + "\n"
 
 
+def compressed_record_generator(records):
+    buffer = io.BytesIO()
+    with gzip.GzipFile(fileobj=buffer, mode="w") as f:
+        for record in record_generator(records):
+            f.write(record.encode("utf-8"))
+    buffer.seek(0)
+    while chunk := buffer.read(8192):
+        yield chunk
+
+
 @router.post("/get_data")
 async def get_nasdaq_data_by_date(request: Request):
     body = await request.json()
@@ -144,7 +156,9 @@ async def get_nasdaq_data_by_date(request: Request):
         records = await fetch_all_data(pool, symbol, start_datetime)
         logger.info("Returning records")
         return StreamingResponse(
-            record_generator(records), media_type="application/json"
+            compressed_record_generator(records),
+            media_type="application/json",
+            headers={"Content-Encoding": "gzip"},
         )
     finally:
         await pool.close()
