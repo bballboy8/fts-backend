@@ -1,5 +1,9 @@
+import json
+import os
 from typing import Optional
-from fastapi import APIRouter
+import asyncpg
+from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse
 from app.schemas.nasdaq import Nasdaq
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers
 from fastapi import WebSocket
@@ -20,6 +24,15 @@ desired_timezone = pytz.timezone("America/New_York")
 # Convert the UTC time to the desired timezone
 localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(desired_timezone)
 midnight_time = datetime.combine(localized_datetime, datetime.min.time())
+
+
+db_params = {
+    "dbname": os.getenv("dbname"),
+    "user": os.getenv("user"),
+    "password": os.getenv("password"),
+    "host": os.getenv("host"),
+    "port": "5432",
+}
 
 
 def call_with_future(fn, future, args, kwargs):
@@ -97,10 +110,44 @@ class WebSocketManager:
 #         # await manager.send_personal_message("Bye!!!", websocket)
 
 
+def record_generator(records):
+    for record in records:
+        record_dict = dict(record)
+        # Convert datetime objects to strings
+        for key, value in record_dict.items():
+            if isinstance(value, datetime):
+                record_dict[key] = value.isoformat()
+        yield json.dumps(record_dict) + "\n"
+
+
 @router.post("/get_data")
-async def get_nasdaq_data_by_date(request: Optional[Nasdaq]):
-    records = await fetch_all_data(request.symbol, request.start_datetime)
-    return records
+async def get_nasdaq_data_by_date(request: Request):
+    body = await request.json()
+    symbol = body.get("symbol")
+    start_datetime = body.get("start_datetime")
+
+    logger.info("Starting get_nasdaq_data_by_date...")
+    start_datetime = (
+        datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M") if start_datetime else None
+    )
+
+    pool = await asyncpg.create_pool(
+        database=db_params["dbname"],
+        user=db_params["user"],
+        password=db_params["password"],
+        host=db_params["host"],
+        port=db_params["port"],
+    )
+
+    try:
+        logger.info("Fetching data")
+        records = await fetch_all_data(pool, symbol, start_datetime)
+        logger.info("Returning records")
+        return StreamingResponse(
+            record_generator(records), media_type="application/json"
+        )
+    finally:
+        await pool.close()
 
 
 @router.get("/get_tickers")

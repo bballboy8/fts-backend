@@ -1,8 +1,11 @@
 import os
+from typing import Optional
 import dotenv
 import asyncpg
 import asyncio
 from datetime import datetime
+
+from fastapi import HTTPException
 
 from app.application_logger import get_logger
 
@@ -19,50 +22,51 @@ db_params = {
 }
 
 
-async def fetch_all_data(symbol=None, start_datetime=None):
-    conn = await asyncpg.connect(
-        database=db_params["dbname"],
-        user=db_params["user"],
-        password=db_params["password"],
-        host=db_params["host"],
-        port=db_params["port"],
-    )
+async def fetch_all_data(
+    pool,
+    symbol: Optional[str],
+    start_datetime: Optional[datetime],
+):
+    async with pool.acquire() as conn:
+        logger.info("Acquired connection from pool")
 
-    logger.info("Connected to DB")
+        # Base query
+        query = "SELECT date, symbol, size, price FROM stock_data_partitioned WHERE msgType = 'T'"
+        conditions = []
+        values = []
 
-    # Convert start_datetime to a datetime object if provided
-    if start_datetime:
-        start_datetime = datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
+        if symbol:
+            conditions.append(f"symbol = ${len(values) + 1}")
+            values.append(symbol)
+        if start_datetime:
+            conditions.append(f"date >= ${len(values) + 1}::timestamp")
+            values.append(start_datetime)
 
-    # Base query
-    query = "SELECT date, symbol, size, price FROM stock_data_partitioned where msgType = 'T'"
-    conditions = []
-    values = []
+        if conditions:
+            query += " AND " + " AND ".join(conditions)
 
-    # Adding filters if they are provided
-    if symbol:
-        conditions.append(" and symbol = $1")
-        values.append(symbol)
-    if start_datetime:
-        conditions.append(f" and date >= ${len(values) + 1}::timestamp")
-        values.append(start_datetime)
+        logger.info(f"Executing query: {query}")
+        logger.info(f"With values: {values}")
 
-    if conditions:
-        query += " ".join(conditions)
+        # Construct the query for logging with actual values
+        logged_query = query
+        for i, val in enumerate(values, 1):
+            if isinstance(val, str):
+                val = f"'{val}'"
+            elif isinstance(val, datetime):
+                val = f"'{val.isoformat()}'"
+            logged_query = logged_query.replace(f"${i}", str(val), 1)
 
-    logger.info(f"Executing query: {query}")
-    logger.info(f"With values: {values}")
+        logger.info(f"Executing query: {logged_query}")
+        logger.info(f"With values: {values}")
 
-    try:
-        # Execute the query with the values
-        records = await conn.fetch(query, *values)
-    except Exception as e:
-        logger.error(f"Error executing query: {e}", exc_info=True)
-        raise
-    finally:
-        await conn.close()
-
-    return records
+        try:
+            records = await conn.fetch(query, *values)
+            logger.info(f"Fetched {len(records)} records")
+            return records
+        except Exception as e:
+            logger.error(f"Error executing query: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 async def fetch_all_tickers():
