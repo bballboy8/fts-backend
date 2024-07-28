@@ -2,6 +2,7 @@ import gzip
 import io
 import json
 import os
+import time
 from typing import Optional
 import asyncpg
 from fastapi import APIRouter, Request
@@ -112,28 +113,31 @@ class WebSocketManager:
 #         # await manager.send_personal_message("Bye!!!", websocket)
 
 
-def record_generator(records):
+async def async_record_generator(records):
     for record in records:
         record_dict = dict(record)
-        # Convert datetime objects to strings
         for key, value in record_dict.items():
             if isinstance(value, datetime):
                 record_dict[key] = value.isoformat()
         yield json.dumps(record_dict) + "\n"
 
 
-def compressed_record_generator(records):
+async def async_compressed_record_generator(
+    records, chunk_size=65536, compression_level=1
+):
     buffer = io.BytesIO()
-    with gzip.GzipFile(fileobj=buffer, mode="w") as f:
-        for record in record_generator(records):
+    with gzip.GzipFile(fileobj=buffer, mode="w", compresslevel=compression_level) as f:
+        async for record in async_record_generator(records):
             f.write(record.encode("utf-8"))
     buffer.seek(0)
-    while chunk := buffer.read(8192):
+    while chunk := buffer.read(chunk_size):
         yield chunk
 
 
 @router.post("/get_data")
 async def get_nasdaq_data_by_date(request: Request):
+    start_time = time.time()
+
     body = await request.json()
     symbol = body.get("symbol")
     start_datetime = body.get("start_datetime")
@@ -152,16 +156,33 @@ async def get_nasdaq_data_by_date(request: Request):
     )
 
     try:
+        fetch_start_time = time.time()
         logger.info("Fetching data")
         records = await fetch_all_data(pool, symbol, start_datetime)
+        fetch_end_time = time.time()
+        logger.info(f"Data fetched in {fetch_end_time - fetch_start_time:.2f} seconds")
+
+        serialize_start_time = time.time()
         logger.info("Returning records")
-        return StreamingResponse(
-            compressed_record_generator(records),
+        chunk_size = 65536  # Adjust chunk size if necessary
+        compression_level = 1  # Lower compression level for faster compression
+        response = StreamingResponse(
+            async_compressed_record_generator(
+                records, chunk_size=chunk_size, compression_level=compression_level
+            ),
             media_type="application/json",
-            headers={"Content-Encoding": "gzip"},
+            headers={"Content-Encoding": "gzip", "Transfer-Encoding": "chunked"},
         )
+        serialize_end_time = time.time()
+        logger.info(
+            f"Data serialized and compressed in {serialize_end_time - serialize_start_time:.2f} seconds"
+        )
+
+        return response
     finally:
         await pool.close()
+        end_time = time.time()
+        logger.info(f"Total time taken: {end_time - start_time:.2f} seconds")
 
 
 @router.get("/get_tickers")

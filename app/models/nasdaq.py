@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Optional
 import dotenv
 import asyncpg
@@ -27,7 +28,9 @@ async def fetch_all_data(
     symbol: Optional[str],
     start_datetime: Optional[datetime],
 ):
+    start_time = time.time()
     async with pool.acquire() as conn:
+        connection_acquire_time = time.time()
         logger.info("Acquired connection from pool")
 
         # Base query
@@ -45,6 +48,10 @@ async def fetch_all_data(
         if conditions:
             query += " AND " + " AND ".join(conditions)
 
+        query_prepare_time = time.time()
+        logger.info(
+            f"Query prepared in {query_prepare_time - connection_acquire_time:.2f} seconds"
+        )
         logger.info(f"Executing query: {query}")
         logger.info(f"With values: {values}")
 
@@ -58,15 +65,24 @@ async def fetch_all_data(
             logged_query = logged_query.replace(f"${i}", str(val), 1)
 
         logger.info(f"Executing query: {logged_query}")
-        logger.info(f"With values: {values}")
 
         try:
+            query_start_time = time.time()
             records = await conn.fetch(query, *values)
+            query_end_time = time.time()
+            logger.info(
+                f"Query executed in {query_end_time - query_start_time:.2f} seconds"
+            )
             logger.info(f"Fetched {len(records)} records")
             return records
         except Exception as e:
             logger.error(f"Error executing query: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            end_time = time.time()
+            logger.info(
+                f"Total fetch_all_data time: {end_time - start_time:.2f} seconds"
+            )
 
 
 async def fetch_all_tickers():
