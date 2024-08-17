@@ -63,6 +63,9 @@ class UserSignUp(BaseModel):
 
     user_id: str = Field(..., title="User ID", max_length=50)
     password: str = Field(..., title="Password", min_length=8)
+    confirm_password: Optional[str] = Field(
+        None, title="Confirm Password", min_length=8
+    )
     first_name: str = Field(..., title="First Name", max_length=50)
     last_name: str = Field(..., title="Last Name", max_length=50)
     email: EmailStr = Field(..., title="Email")
