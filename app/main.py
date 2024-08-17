@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from app.routers import user
 from app.routers import nasdaq
-from app.services.dynamodb_service import create_dynamodb_tables
+from app.models.user import create_users_table, create_user_settings_table
 
 import logging
 
@@ -17,8 +17,11 @@ app.include_router(nasdaq.router)
 
 @app.on_event("startup")
 async def startup_event():
-    create_dynamodb_tables()
-    logging.info("DynamoDB tables checked/created on startup")
+    await create_users_table()
+    logging.info("users tables checked/created on startup")
+
+    await create_user_settings_table()
+    logging.info("users tables checked/created on startup")
 
 
 @app.get("/")
