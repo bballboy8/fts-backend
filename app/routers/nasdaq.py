@@ -221,7 +221,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
         try:
             if not consumer:
                 consumer = init_nasdaq_kafka_connection(topic)
-            messages = consumer.consume(num_messages=2000, timeout=0.5)
+            messages = consumer.consume(num_messages=2000, timeout=0.1)
             response = makeRespFromKafkaMessages(messages)
             for idx, connection in enumerate(manager.active_connections):
                 if connection["isRunning"]:
