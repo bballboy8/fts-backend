@@ -227,6 +227,9 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                 if connection["isRunning"]:
                     webSocket = connection["socket"]
                     try:
+                        logger.info(
+                            f"Before send json, this is the response: {response}"
+                        )
                         await webSocket.send_json(response)
                     except Exception as e:
                         logger.error(
