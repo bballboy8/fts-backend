@@ -227,9 +227,6 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                 if connection["isRunning"]:
                     webSocket = connection["socket"]
                     try:
-                        logger.info(
-                            f"Before send json, this is the response: {response}"
-                        )
                         await webSocket.send_json(response)
                     except Exception as e:
                         logger.error(
@@ -239,6 +236,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                         logger.error(
                             f"Total Connections: {len(manager.active_connections)}"
                         )
+                        logger.info(f"In except, this is the response: {response}")
                         consumer = None
         except Exception as e:
             logger.error(f"Error in consuming: {e}", exc_info=True)
