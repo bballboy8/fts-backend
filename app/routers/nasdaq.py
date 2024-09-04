@@ -2,11 +2,13 @@ from typing import Optional
 from app.schemas.nasdaq import Nasdaq
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from concurrent.futures import Future
+from starlette.websockets import WebSocketState
 from threading import Thread
 from app.application_logger import get_logger
 from ncdssdk import NCDSClient
-import pytz, asyncio, os, logging
+import pytz
+import asyncio
+import os
 from datetime import timedelta, datetime
 
 logger = get_logger(__name__)
@@ -226,18 +228,22 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
             for idx, connection in enumerate(manager.active_connections):
                 if connection["isRunning"]:
                     webSocket = connection["socket"]
-                    try:
-                        await webSocket.send_json(response)
-                    except Exception as e:
-                        logger.error(
-                            f"Error occurred while sending data to client: {e}",
-                            exc_info=True,
-                        )
-                        logger.error(
-                            f"Total Connections: {len(manager.active_connections)}"
-                        )
-                        logger.info(f"In except, this is the response: {response}")
-                        consumer = None
+                    # Check if the WebSocket is still connected
+                    if webSocket.application_state == WebSocketState.CONNECTED:
+                        try:
+                            await webSocket.send_json(response)
+                        except Exception as e:
+                            logger.error(
+                                f"Error occurred while sending data to client: {e}",
+                                exc_info=True,
+                            )
+                            logger.error(
+                                f"Total Connections: {len(manager.active_connections)}"
+                            )
+                            logger.info(f"In except, this is the response: {response}")
+                            consumer = None
+                    else:
+                        logger.info(f"WebSocket {webSocket} is not connected.")
         except Exception as e:
             logger.error(f"Error in consuming: {e}", exc_info=True)
             consumer = None
