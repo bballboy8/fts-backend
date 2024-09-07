@@ -76,7 +76,11 @@ manager_cta = manager_dummy
 
 @router.websocket("/get_real_data_utp")
 async def websocket_endpoint_utp(websocket: WebSocket):
-    await manager_utp.connect(websocket)
+    if manager_utp.is_connected(websocket):
+        # If already connected, return without connecting again
+        await websocket.send_text("Already connected")
+    else:
+        await manager_utp.connect(websocket)
     try:
         while True:
             data = await websocket.receive_text()
@@ -93,7 +97,11 @@ async def websocket_endpoint_utp(websocket: WebSocket):
 
 @router.websocket("/get_real_data_cta")
 async def websocket_endpoint_cta(websocket: WebSocket):
-    await manager_cta.connect(websocket)
+    if manager_cta.is_connected(websocket):
+        # If already connected, return without connecting again
+        await websocket.send_text("Already connected")
+    else:
+        await manager_cta.connect(websocket)
     try:
         while True:
             data = await websocket.receive_text()
@@ -110,7 +118,11 @@ async def websocket_endpoint_cta(websocket: WebSocket):
 
 @router.websocket("/get_real_data_dummy")
 async def websocket_endpoint_dummy(websocket: WebSocket):
-    await manager_dummy.connect(websocket)
+    if manager_dummy.is_connected(websocket):
+        # If already connected, return without connecting again
+        await websocket.send_text("Already connected")
+    else:
+        await manager_dummy.connect(websocket)
     try:
         while True:
             data = await websocket.receive_text()
@@ -321,7 +333,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
         while True:
             try:
                 # Add a delay of 0.1 seconds before the next loop iteration
-                time.sleep(0.1)
+                time.sleep(1)
                 # Generate Dummy messages for all symbols
                 dummy_messages = []
                 for symbol in symbols:
