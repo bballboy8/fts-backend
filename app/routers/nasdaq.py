@@ -10,6 +10,8 @@ import pytz
 import asyncio
 import os
 from datetime import timedelta, datetime
+import random
+import time
 
 logger = get_logger(__name__)
 
@@ -67,6 +69,9 @@ manager_utp = WebSocketManager()
 # New manager for NLSCTA
 manager_cta = WebSocketManager()
 
+# New manager for Sample Data Symbol AAPL
+manager_dummy = WebSocketManager()
+
 
 @router.websocket("/get_real_data_utp")
 async def websocket_endpoint_utp(websocket: WebSocket):
@@ -102,6 +107,23 @@ async def websocket_endpoint_cta(websocket: WebSocket):
         # await manager_cta.send_personal_message("Bye!!!", websocket)
 
 
+@router.websocket("/get_real_data_dummy")
+async def websocket_endpoint_dummy(websocket: WebSocket):
+    await manager_dummy.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "start":
+                manager_dummy.startStream(websocket)
+            elif data == "stop":
+                manager_dummy.stopStream(websocket)
+            await manager_dummy.send_personal_message(f"Received:{data}", websocket)
+    except WebSocketDisconnect:
+        print("disconnected")
+        manager_dummy.disconnect(websocket)
+        # await manager_cta.send_personal_message("Bye!!!", websocket)
+
+
 @router.post("/get_data")
 async def get_nasdaq_data_by_date(request: Optional[Nasdaq]):
     records = await fetch_all_data(request.symbol, request.start_datetime)
@@ -130,47 +152,23 @@ async def get_connections_cta():
     return connections
 
 
-def makeRespFromKafkaMessages(messages):
-    resp = {
-        "headers": [
-            "trackingID",
-            "date",
-            "msgType",
-            "symbol",
-            "price",
-            "soup_partition",
-            "soup_sequence",
-            "market_center",
-            "security_class",
-            "control_number",
-            "size",
-            "sale_condition",
-            "consolidated_volume",
-        ],
-        "data": [],
+def init_nasdaq_kafka_connection(topic):
+    print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
+    security_cfg = {
+        "oauth.token.endpoint.uri": os.getenv("NASDAQ_KAFKA_ENDPOINT"),
+        "oauth.client.id": os.getenv("NASDAQ_KAFKA_CLIENT_ID"),
+        "oauth.client.secret": os.getenv("NASDAQ_KAFKA_CLIENT_SECRET"),
     }
-    for message in messages:
-        msg = message.value()
-        resp["data"].append(
-            (
-                [
-                    int(msg["trackingID"]),
-                    str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
-                    msg["msgType"],
-                    msg["symbol"] if "symbol" in msg else "",
-                    int(msg["price"]) if "price" in msg else -1,
-                    msg.get("SoupPartition"),
-                    msg.get("SoupSequence"),
-                    msg.get("marketCenter"),
-                    msg.get("securityClass"),
-                    msg.get("controlNumber"),
-                    msg.get("size"),
-                    msg.get("saleCondition"),
-                    msg.get("cosolidatedVolume"),
-                ]
-            )
-        )
-    return resp
+    kafka_cfg = {
+        "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
+        "auto.offset.reset": "latest",
+        "socket.keepalive.enable": True,
+    }
+
+    ncds_client = NCDSClient(security_cfg, kafka_cfg)
+    consumer = ncds_client.ncds_kafka_consumer(topic)
+    logger.info(f"Success to connect NASDAQ Kafka server for topic {topic}.")
+    return consumer
 
 
 def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
@@ -197,26 +195,154 @@ def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
     return timestamp
 
 
-def init_nasdaq_kafka_connection(topic):
-    print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
-    security_cfg = {
-        "oauth.token.endpoint.uri": os.getenv("NASDAQ_KAFKA_ENDPOINT"),
-        "oauth.client.id": os.getenv("NASDAQ_KAFKA_CLIENT_ID"),
-        "oauth.client.secret": os.getenv("NASDAQ_KAFKA_CLIENT_SECRET"),
-    }
-    kafka_cfg = {
-        "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
-        "auto.offset.reset": "latest",
-        "socket.keepalive.enable": True,
+def makeRespFromKafkaMessages(messages, is_dummy=False):
+    resp = {
+        "headers": [
+            "trackingID",
+            "date",
+            "msgType",
+            "symbol",
+            "price",
+            "soup_partition",
+            "soup_sequence",
+            "market_center",
+            "security_class",
+            "control_number",
+            "size",
+            "sale_condition",
+            "consolidated_volume",
+        ],
+        "data": [],
     }
 
-    ncds_client = NCDSClient(security_cfg, kafka_cfg)
-    consumer = ncds_client.ncds_kafka_consumer(topic)
-    logger.info(f"Success to connect NASDAQ Kafka server for topic {topic}.")
-    return consumer
+    # Get current date and time if is_dummy is True
+    current_timestamp = (
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f") if is_dummy else None
+    )
+
+    for message in messages:
+        msg = message.value()
+        resp["data"].append(
+            (
+                [
+                    int(msg["trackingID"]),
+                    current_timestamp
+                    if is_dummy
+                    else str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
+                    msg["msgType"],
+                    msg["symbol"] if "symbol" in msg else "",
+                    int(msg["price"]) if "price" in msg else -1,
+                    msg.get("SoupPartition"),
+                    msg.get("SoupSequence"),
+                    msg.get("marketCenter"),
+                    msg.get("securityClass"),
+                    msg.get("controlNumber"),
+                    msg.get("size"),
+                    msg.get("saleCondition"),
+                    msg.get("cosolidatedVolume"),
+                ]
+            )
+        )
+    return resp
+
+
+# Initialize a price dictionary to maintain the state of the prices for each symbol
+price_state = {}
+
+
+# Convert tracking ID to timestamp
+def generate_dummy_message(symbol):
+    # Define the price range for the dummy messages
+    min_price = 2257000
+    max_price = 2357000
+
+    # Cycle price within the range for the symbol
+    if symbol not in price_state:
+        price_state[symbol] = random.randint(min_price, max_price)
+    else:
+        # Increment or reset the price within the range
+        if price_state[symbol] >= max_price:
+            price_state[symbol] = min_price
+        else:
+            price_state[symbol] += random.randint(1, 5)
+
+    # Generate a valid 14-digit tracking ID
+    current_time_millis = int(time.time() * 1000)
+    tracking_id = str(current_time_millis).ljust(
+        14, "0"
+    )  # Pad with zeros to ensure 14 digits
+
+    # Generate a dummy message
+    message = {
+        "trackingID": tracking_id,
+        "msgType": "T",
+        "symbol": symbol,
+        "price": price_state[symbol],
+        "SoupPartition": random.randint(1, 10),
+        "SoupSequence": random.randint(1, 100),
+        "marketCenter": "Q",
+        "securityClass": "Q",
+        "controlNumber": random.randint(1, 100000),
+        "size": random.randint(1, 1000),
+        "saleCondition": "@FTo",
+        "cosolidatedVolume": random.randint(1, 10000),
+    }
+
+    return DummyMessage(message)
+
+
+class DummyMessage:
+    def __init__(self, message):
+        self.message = message
+
+    def value(self):
+        return self.message
 
 
 async def listen_message_from_nasdaq_kafka(manager, topic):
+    if topic == "DUMMY":
+        records = await fetch_all_tickers()
+        symbols = [rec["symbol"] for rec in records]
+        while True:
+            try:
+                # Add a delay of 0.1 seconds before the next loop iteration
+                await asyncio.sleep(0.1)
+                # Generate Dummy messages for all symbols
+                dummy_messages = []
+                for symbol in symbols:
+                    dummy_messages.extend(
+                        [
+                            generate_dummy_message(symbol)
+                            for _ in range(random.randint(1, 3))
+                        ]
+                    )
+
+                response = makeRespFromKafkaMessages(dummy_messages, is_dummy=True)
+                for idx, connection in enumerate(manager.active_connections):
+                    if connection["isRunning"]:
+                        webSocket = connection["socket"]
+                        # Check if the WebSocket is still connected
+                        if webSocket.application_state == WebSocketState.CONNECTED:
+                            try:
+                                await webSocket.send_json(response)
+                                # logger.info(f"Sent data to client {webSocket}.")
+                            except Exception as e:
+                                logger.error(
+                                    f"Error occurred while sending data to client: {e}",
+                                    exc_info=True,
+                                )
+                                # Remove or update the connection state
+                                connection["isRunning"] = False
+                                await manager.disconnect(
+                                    connection
+                                )  # Consider adding a method to disconnect clients
+                        else:
+                            logger.info(f"WebSocket {webSocket} is not connected.")
+            except Exception as e:
+                logger.error(f"Error in dummy data websocket: {e}", exc_info=True)
+
+        return
+
     consumer = None
     logger.info(f"Starting listening messages from nasdaq kafka for topic {topic}!")
     while True:
@@ -232,16 +358,17 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                     if webSocket.application_state == WebSocketState.CONNECTED:
                         try:
                             await webSocket.send_json(response)
+                            # logger.info(f"Sent data to client {webSocket}.")
                         except Exception as e:
                             logger.error(
                                 f"Error occurred while sending data to client: {e}",
                                 exc_info=True,
                             )
-                            logger.error(
-                                f"Total Connections: {len(manager.active_connections)}"
-                            )
-                            logger.info(f"In except, this is the response: {response}")
-                            consumer = None
+                            # Remove or update the connection state
+                            connection["isRunning"] = False
+                            await manager.disconnect(
+                                connection
+                            )  # Consider adding a method to disconnect clients
                     else:
                         logger.info(f"WebSocket {webSocket} is not connected.")
         except Exception as e:
@@ -262,6 +389,12 @@ async def startup_event():
         target=between_callback, args=(manager_cta, "NLSCTA")
     )
     nasdaq_kafka_thread_cta.start()
+
+    # Start thread for dummy
+    nasdaq_kafka_thread_dummy = Thread(
+        target=between_callback, args=(manager_dummy, "DUMMY")
+    )
+    nasdaq_kafka_thread_dummy.start()
 
 
 def between_callback(manager, topic):
