@@ -62,6 +62,13 @@ class WebSocketManager:
                 self.active_connections.remove(connection)
                 break
 
+    def is_connected(self, websocket: WebSocket) -> bool:
+        """Check if a websocket is currently connected"""
+        for connection in self.active_connections:
+            if connection["socket"] == websocket:
+                return True
+        return False
+
 
 # New manager for Sample Data Symbol AAPL
 manager_dummy = WebSocketManager()
