@@ -372,10 +372,10 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
 @router.on_event("startup")
 async def startup_event():
     # Start thread for NLSUTP
-    nasdaq_kafka_thread_utp = Thread(
-        target=between_callback, args=(manager_utp, "NLSUTP")
-    )
-    nasdaq_kafka_thread_utp.start()
+    # nasdaq_kafka_thread_utp = Thread(
+    #     target=between_callback, args=(manager_utp, "NLSUTP")
+    # )
+    # nasdaq_kafka_thread_utp.start()
 
     # Start thread for dummy
     nasdaq_kafka_thread_dummy = Thread(
