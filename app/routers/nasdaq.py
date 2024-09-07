@@ -217,9 +217,23 @@ def makeRespFromKafkaMessages(messages, is_dummy=False):
     }
 
     # Get current date and time if is_dummy is True
-    current_timestamp = (
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f") if is_dummy else None
-    )
+    if is_dummy:
+        # Get current datetime
+        current_datetime = datetime.now()
+
+        # Extract the hour from the current datetime
+        hour = current_datetime.hour
+
+        # Adjust the hour to ensure it's between 4 AM and 8 PM
+        if hour < 4:
+            # If before 4 AM, add hours to bring it to 4 AM
+            current_datetime += timedelta(hours=(4 - hour))
+        elif hour > 20:
+            # If after 8 PM, subtract hours to bring it to 8 PM
+            current_datetime -= timedelta(hours=(hour - 20))
+
+        # Format the adjusted datetime to the desired format
+        current_timestamp = current_datetime.strftime("%Y-%m-%d %H:%M:%S.%f")
 
     for message in messages:
         msg = message.value()
