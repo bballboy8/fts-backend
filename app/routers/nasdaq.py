@@ -68,7 +68,7 @@ manager_dummy = WebSocketManager()
 
 
 # Existing manager for NLSUTP
-manager_utp = manager_dummy
+manager_utp = WebSocketManager()
 
 # New manager for NLSCTA
 manager_cta = manager_dummy
@@ -307,7 +307,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
         while True:
             try:
                 # Add a delay of 0.1 seconds before the next loop iteration
-                await asyncio.sleep(0.1)
+                time.sleep(0.1)
                 # Generate Dummy messages for all symbols
                 dummy_messages = []
                 for symbol in symbols:
@@ -338,8 +338,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                                     manager.disconnect(
                                         connection
                                     )  # Consider adding a method to disconnect clients
-                        else:
-                            logger.info(f"WebSocket {webSocket} is not connected.")
+
             except Exception as e:
                 logger.error(f"Error in dummy data websocket: {e}", exc_info=True)
 
@@ -372,8 +371,6 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                                 manager.disconnect(
                                     connection
                                 )  # Consider adding a method to disconnect clients
-                    else:
-                        logger.info(f"WebSocket {webSocket} is not connected.")
         except Exception as e:
             logger.error(f"Error in consuming: {e}", exc_info=True)
             consumer = None
@@ -382,16 +379,10 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
 @router.on_event("startup")
 async def startup_event():
     # Start thread for NLSUTP
-    # nasdaq_kafka_thread_utp = Thread(
-    #     target=between_callback, args=(manager_utp, "NLSUTP")
-    # )
-    # nasdaq_kafka_thread_utp.start()
-    #
-    # # Start thread for NLSCTA
-    # nasdaq_kafka_thread_cta = Thread(
-    #     target=between_callback, args=(manager_cta, "NLSCTA")
-    # )
-    # nasdaq_kafka_thread_cta.start()
+    nasdaq_kafka_thread_utp = Thread(
+        target=between_callback, args=(manager_utp, "NLSUTP")
+    )
+    nasdaq_kafka_thread_utp.start()
 
     # Start thread for dummy
     nasdaq_kafka_thread_dummy = Thread(
