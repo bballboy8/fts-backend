@@ -331,11 +331,12 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                                     f"Error occurred while sending data to client: {e}",
                                     exc_info=True,
                                 )
-                                # Remove or update the connection state
-                                connection["isRunning"] = False
-                                await manager.disconnect(
-                                    connection
-                                )  # Consider adding a method to disconnect clients
+                                if connection and manager:
+                                    # Remove or update the connection state
+                                    connection["isRunning"] = False
+                                    manager.disconnect(
+                                        connection
+                                    )  # Consider adding a method to disconnect clients
                         else:
                             logger.info(f"WebSocket {webSocket} is not connected.")
             except Exception as e:
@@ -364,11 +365,12 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                                 f"Error occurred while sending data to client: {e}",
                                 exc_info=True,
                             )
-                            # Remove or update the connection state
-                            connection["isRunning"] = False
-                            await manager.disconnect(
-                                connection
-                            )  # Consider adding a method to disconnect clients
+                            if connection and manager:
+                                # Remove or update the connection state
+                                connection["isRunning"] = False
+                                manager.disconnect(
+                                    connection
+                                )  # Consider adding a method to disconnect clients
                     else:
                         logger.info(f"WebSocket {webSocket} is not connected.")
         except Exception as e:
