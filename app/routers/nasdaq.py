@@ -303,7 +303,7 @@ class DummyMessage:
 async def listen_message_from_nasdaq_kafka(manager, topic):
     if topic == "DUMMY":
         records = await fetch_all_tickers()
-        symbols = [rec["symbol"] for rec in records]
+        symbols = [rec["symbol"] for rec in records if rec["symbol"]]
         while True:
             try:
                 # Add a delay of 0.1 seconds before the next loop iteration
