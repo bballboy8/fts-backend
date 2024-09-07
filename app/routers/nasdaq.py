@@ -68,7 +68,7 @@ manager_dummy = WebSocketManager()
 
 
 # Existing manager for NLSUTP
-manager_utp = WebSocketManager()
+manager_utp = manager_dummy
 
 # New manager for NLSCTA
 manager_cta = manager_dummy
