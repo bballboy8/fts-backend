@@ -63,14 +63,15 @@ class WebSocketManager:
                 break
 
 
-# Existing manager for NLSUTP
-manager_utp = WebSocketManager()
-
-# New manager for NLSCTA
-manager_cta = WebSocketManager()
-
 # New manager for Sample Data Symbol AAPL
 manager_dummy = WebSocketManager()
+
+
+# Existing manager for NLSUTP
+manager_utp = manager_dummy
+
+# New manager for NLSCTA
+manager_cta = manager_dummy
 
 
 @router.websocket("/get_real_data_utp")
@@ -381,16 +382,16 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
 @router.on_event("startup")
 async def startup_event():
     # Start thread for NLSUTP
-    nasdaq_kafka_thread_utp = Thread(
-        target=between_callback, args=(manager_utp, "NLSUTP")
-    )
-    nasdaq_kafka_thread_utp.start()
-
-    # Start thread for NLSCTA
-    nasdaq_kafka_thread_cta = Thread(
-        target=between_callback, args=(manager_cta, "NLSCTA")
-    )
-    nasdaq_kafka_thread_cta.start()
+    # nasdaq_kafka_thread_utp = Thread(
+    #     target=between_callback, args=(manager_utp, "NLSUTP")
+    # )
+    # nasdaq_kafka_thread_utp.start()
+    #
+    # # Start thread for NLSCTA
+    # nasdaq_kafka_thread_cta = Thread(
+    #     target=between_callback, args=(manager_cta, "NLSCTA")
+    # )
+    # nasdaq_kafka_thread_cta.start()
 
     # Start thread for dummy
     nasdaq_kafka_thread_dummy = Thread(
