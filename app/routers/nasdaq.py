@@ -298,7 +298,7 @@ price_state = {}
 def generate_dummy_message(symbol):
     # Define the price range for the dummy messages
     min_price = 2257000
-    max_price = 2357000
+    max_price = 2258000
 
     # Cycle price within the range for the symbol
     if symbol not in price_state:
@@ -308,7 +308,7 @@ def generate_dummy_message(symbol):
         if price_state[symbol] >= max_price:
             price_state[symbol] = min_price
         else:
-            price_state[symbol] += random.randint(1, 5)
+            price_state[symbol] += random.randint(1, 50)
 
     # Generate a valid 14-digit tracking ID
     current_time_millis = int(time.time() * 1000)
