@@ -332,12 +332,6 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                                     f"Error occurred while sending data to client: {e}",
                                     exc_info=True,
                                 )
-                                if connection and manager:
-                                    # Remove or update the connection state
-                                    connection["isRunning"] = False
-                                    manager.disconnect(
-                                        connection
-                                    )  # Consider adding a method to disconnect clients
 
             except Exception as e:
                 logger.error(f"Error in dummy data websocket: {e}", exc_info=True)
@@ -365,12 +359,11 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                                 f"Error occurred while sending data to client: {e}",
                                 exc_info=True,
                             )
-                            if connection and manager:
-                                # Remove or update the connection state
-                                connection["isRunning"] = False
-                                manager.disconnect(
-                                    connection
-                                )  # Consider adding a method to disconnect clients
+                            logger.error(
+                                f"Total Connections: {len(manager.active_connections)}"
+                            )
+                            logger.info(f"In except, this is the response: {response}")
+                            consumer = None
         except Exception as e:
             logger.error(f"Error in consuming: {e}", exc_info=True)
             consumer = None
