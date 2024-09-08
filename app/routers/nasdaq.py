@@ -3,11 +3,9 @@ import io
 import json
 import os
 import time
-from typing import Optional
 import asyncpg
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
-from app.schemas.nasdaq import Nasdaq
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers
 from fastapi import WebSocket
 from concurrent.futures import Future
@@ -15,6 +13,7 @@ from threading import Thread
 from app.application_logger import get_logger
 import pytz
 from datetime import timedelta, datetime
+from fastapi import HTTPException
 
 logger = get_logger(__name__)
 
@@ -161,6 +160,11 @@ async def get_nasdaq_data_by_date(request: Request):
         records = await fetch_all_data(pool, symbol, start_datetime)
         fetch_end_time = time.time()
         logger.info(f"Data fetched in {fetch_end_time - fetch_start_time:.2f} seconds")
+
+        # Check if no records are returned
+        if not records:
+            logger.info("No records found")
+            return HTTPException(status_code=204, detail="No data found")
 
         serialize_start_time = time.time()
         logger.info("Returning records")
