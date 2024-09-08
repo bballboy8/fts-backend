@@ -350,7 +350,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
         while True:
             try:
                 # Add a delay of 0.1 seconds before the next loop iteration
-                time.sleep(1)
+                time.sleep(0.1)
                 # Generate Dummy messages for all symbols
                 dummy_messages = []
                 for symbol in symbols:
