@@ -12,7 +12,7 @@ from concurrent.futures import Future
 from threading import Thread
 from app.application_logger import get_logger
 import pytz
-from datetime import timedelta, datetime
+from datetime import datetime
 from fastapi import HTTPException
 
 logger = get_logger(__name__)
@@ -212,30 +212,30 @@ async def get_tickers():
 #         )
 #     return resp
 
-
-def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
-    # Ensure the tracking ID is a string of digits
-    if not tracking_id.isdigit() or len(tracking_id) != 14:
-        raise ValueError("Invalid tracking ID format")
-
-    # Extract bytes 2-7, which represent the timestamp (6 bytes in this case)
-    timestamp_bytes = tracking_id[:]
-
-    # Convert the extracted bytes to an integer representing nanoseconds from midnight
-    nanoseconds_from_midnight = int(timestamp_bytes)
-
-    # Calculate the time of day from the nanoseconds
-    seconds_from_midnight = nanoseconds_from_midnight / 1e9
-    time_of_day = timedelta(seconds=seconds_from_midnight)
-
-    # Assume the date is today for simplicity, adjust as needed
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Add the time of day to the current date
-    timestamp = today + time_of_day
-
-    return timestamp
-
+#
+# def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
+#     # Ensure the tracking ID is a string of digits
+#     if not tracking_id.isdigit() or len(tracking_id) != 14:
+#         raise ValueError("Invalid tracking ID format")
+#
+#     # Extract bytes 2-7, which represent the timestamp (6 bytes in this case)
+#     timestamp_bytes = tracking_id[:]
+#
+#     # Convert the extracted bytes to an integer representing nanoseconds from midnight
+#     nanoseconds_from_midnight = int(timestamp_bytes)
+#
+#     # Calculate the time of day from the nanoseconds
+#     seconds_from_midnight = nanoseconds_from_midnight / 1e9
+#     time_of_day = timedelta(seconds=seconds_from_midnight)
+#
+#     # Assume the date is today for simplicity, adjust as needed
+#     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+#
+#     # Add the time of day to the current date
+#     timestamp = today + time_of_day
+#
+#     return timestamp
+#
 
 # def init_nasdaq_kafka_connection():
 #     print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
