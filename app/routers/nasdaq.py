@@ -7,12 +7,14 @@ from app.application_logger import get_logger
 from ncdssdk import NCDSClient
 import pytz
 import os
+import dotenv
 from datetime import timedelta, datetime
 import pandas as pd
 import time
 import random
 import asyncio
 
+dotenv.load_dotenv()
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/nasdaq", tags=["nasdaq"])
@@ -24,6 +26,7 @@ desired_timezone = pytz.timezone("America/New_York")
 localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(desired_timezone)
 midnight_time = datetime.combine(localized_datetime, datetime.min.time())
 dummy_symbols_price_range = pd.read_csv("app/routers/dummy_data.csv")
+send_dummy_data = os.getenv("SEND_DUMMY_DATA", "true") == "true"
 
 
 class WebSocketManager:
@@ -305,7 +308,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
     logger.info(f"Starting listening messages from nasdaq kafka for topic {topic}!")
     while True:
         try:
-            if not is_market_open():
+            if send_dummy_data and not is_market_open():
                 if not any(
                     connection["isRunning"] for connection in manager.active_connections
                 ):
@@ -319,9 +322,9 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                 # Market is open; consume real data
                 if not consumer:
                     consumer = init_nasdaq_kafka_connection(topic)
+                    logger.info("Market open. Sending real data.")
                 messages = consumer.consume(num_messages=2000, timeout=0.1)
                 response = makeRespFromKafkaMessages(messages)
-                logger.info("Market open. Sending real data.")
             for idx, connection in enumerate(manager.active_connections):
                 if connection["isRunning"]:
                     webSocket = connection["socket"]
