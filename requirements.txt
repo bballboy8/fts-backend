@@ -55,6 +55,7 @@ multidict==6.0.5
 oauthlib==3.2.2
 openai==0.28.1
 orjson==3.10.5
+pandas
 packaging==24.0
 passlib==1.7.4
 pillow==10.3.0
