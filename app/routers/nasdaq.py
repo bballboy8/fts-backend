@@ -286,8 +286,8 @@ def generate_dummy_data():
                 current_timestamp,
                 "T",  # example message type
                 row["symbol"],  # symbol from DataFrame
-                random.uniform(
-                    row["lower_price"], row["higher_price"]
+                random.randint(
+                    int(row["lower_price"]), int(row["higher_price"])
                 ),  # price in dollars
                 "0",  # dummy soup_partition
                 "0",  # dummy soup_sequence
