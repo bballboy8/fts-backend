@@ -6,9 +6,12 @@ from threading import Thread
 from app.application_logger import get_logger
 from ncdssdk import NCDSClient
 import pytz
-import asyncio
 import os
 from datetime import timedelta, datetime
+import pandas as pd
+import time
+import random
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -20,6 +23,7 @@ desired_timezone = pytz.timezone("America/New_York")
 # Convert the UTC time to the desired timezone
 localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(desired_timezone)
 midnight_time = datetime.combine(localized_datetime, datetime.min.time())
+dummy_symbols_price_range = pd.read_csv("app/routers/dummy_data.csv")
 
 
 class WebSocketManager:
@@ -215,15 +219,109 @@ def init_nasdaq_kafka_connection(topic):
     return consumer
 
 
+def is_market_open():
+    """Check if the market is open based on EST time."""
+    est = pytz.timezone("America/New_York")
+    now_est = datetime.now(est)
+
+    # Check if today is a weekend
+    if now_est.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
+        return False
+
+    # Market hours are from 4 AM to 8 PM EST
+    market_open_time = now_est.replace(hour=4, minute=0, second=0, microsecond=0)
+    market_close_time = now_est.replace(hour=20, minute=0, second=0, microsecond=0)
+    return market_open_time <= now_est < market_close_time
+
+
+def generate_dummy_data():
+    """Generate dummy data that simulates the market being open."""
+    # Get current datetime
+    est = pytz.timezone("America/New_York")
+    current_datetime = datetime.now(est)
+
+    # Extract the hour from the current datetime
+    hour = current_datetime.hour
+
+    # Adjust the datetime based on the provided conditions
+    if 20 <= hour <= 23:
+        # If between 8 PM and midnight, adjust the hour and change date to next day
+        adjusted_hour = hour - 16  # 20 -> 4, 21 -> 5, 22 -> 6, 23 -> 7
+        # Handle day rollover
+        current_datetime = current_datetime.replace(hour=adjusted_hour) + timedelta(
+            days=1
+        )
+    elif 0 <= hour < 4:
+        # If between midnight and 4 AM, adjust the hour only
+        adjusted_hour = hour + 8  # 0 -> 8, 1 -> 9, 2 -> 10, 3 -> 11
+        current_datetime = current_datetime.replace(hour=adjusted_hour)
+
+    # Format the adjusted datetime to the desired format
+    current_timestamp = current_datetime.strftime("%Y-%m-%d %H:%M:%S.%f")
+
+    return {
+        "headers": [
+            "trackingID",
+            "date",
+            "msgType",
+            "symbol",
+            "price",
+            "soup_partition",
+            "soup_sequence",
+            "market_center",
+            "security_class",
+            "control_number",
+            "size",
+            "sale_condition",
+            "consolidated_volume",
+        ],
+        "data": [
+            [
+                random.randint(
+                    10000000000000, 99999999999999
+                ),  # dummy trackingID (14-digit)
+                current_timestamp,
+                "T",  # example message type
+                row["symbol"],  # symbol from DataFrame
+                random.uniform(
+                    row["lower_price"], row["higher_price"]
+                ),  # price in dollars
+                "0",  # dummy soup_partition
+                "0",  # dummy soup_sequence
+                "Q",  # dummy market_center
+                "Q",  # dummy security_class
+                "001",  # dummy control_number
+                random.randint(int(row["lower_size"]), int(row["higher_size"])),  # size
+                "@",  # dummy sale_condition
+                random.randint(1000, 1000000),  # dummy consolidated_volume
+            ]
+            for index, row in dummy_symbols_price_range.iterrows()
+        ],
+    }
+
+
 async def listen_message_from_nasdaq_kafka(manager, topic):
     consumer = None
     logger.info(f"Starting listening messages from nasdaq kafka for topic {topic}!")
     while True:
         try:
-            if not consumer:
-                consumer = init_nasdaq_kafka_connection(topic)
-            messages = consumer.consume(num_messages=2000, timeout=0.1)
-            response = makeRespFromKafkaMessages(messages)
+            if not is_market_open():
+                if not any(
+                    connection["isRunning"] for connection in manager.active_connections
+                ):
+                    time.sleep(0.5)
+                    continue
+                time.sleep(0.5)
+                # Market is closed; send dummy data
+                response = generate_dummy_data()
+                logger.info("Market closed. Sending dummy data.")
+            else:
+                # Market is open; consume real data
+                if not consumer:
+                    consumer = init_nasdaq_kafka_connection(topic)
+                messages = consumer.consume(num_messages=2000, timeout=0.1)
+                response = makeRespFromKafkaMessages(messages)
+                logger.info("Market open. Sending real data.")
             for idx, connection in enumerate(manager.active_connections):
                 if connection["isRunning"]:
                     webSocket = connection["socket"]
