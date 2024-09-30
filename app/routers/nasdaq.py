@@ -234,6 +234,7 @@ def is_market_open():
     # Market hours are from 4 AM to 8 PM EST
     market_open_time = now_est.replace(hour=4, minute=0, second=0, microsecond=0)
     market_close_time = now_est.replace(hour=20, minute=0, second=0, microsecond=0)
+    return True
     return market_open_time <= now_est < market_close_time
 
 
