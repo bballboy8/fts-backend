@@ -35,7 +35,7 @@ async def fetch_all_data(symbol=None, start_datetime=None):
         start_datetime = datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
 
     # Base query
-    query = "SELECT date, symbol, size FROM stock_data_partitioned where msgType = 'T'"
+    query = "SELECT date, symbol, size FROM stock_data_partitioned where msgType in ('T', 'h')"
     conditions = []
     values = []
 
