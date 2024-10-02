@@ -71,22 +71,20 @@ def fetch_holidays():
 
             # Create a dictionary for each year with its corresponding holiday name and date
             for year, date_str in zip(years, dates):
-                try:
-                    # Parse the date into a datetime object
-                    date_parts = date_str.split(",")
-                    month_day = (
-                        date_parts[1].strip().split("*")[0].split("(")[0]
-                    )  # Clean extra symbols like *, ()
-                    month, day = month_day.split(" ")
+                # Parse the date into a datetime object
+                date_parts = date_str.split(",")
+                month_day = (
+                    date_parts[1].strip().split("*")[0].split("(")[0]
+                ).strip()  # Clean extra symbols like *, ()
+                month, day = month_day.split(" ")
 
-                    # Construct the full date string
-                    full_date_str = f"{year} {month} {day.strip()}"
-                    date_time = datetime.strptime(full_date_str, "%Y %B %d")
+                # Construct the full date string
+                full_date_str = f"{year} {month} {day.strip()}"
+                # Parse the full date string
+                date_time = datetime.strptime(full_date_str, "%Y %B %d")
 
-                    # Format the datetime object
-                    formatted_date_time = date_time.strftime("%Y-%m-%d")
-                except Exception:
-                    formatted_date_time = "Invalid Date Format"
+                # Format the datetime object
+                formatted_date_time = date_time.strftime("%Y-%m-%d")
 
                 holidays.append(
                     {
@@ -443,3 +441,8 @@ def between_callback(manager, topic):
         loop.run_until_complete(listen_message_from_nasdaq_kafka(manager, topic))
     finally:
         loop.close()
+
+
+if __name__ == "__main__":
+    output = fetch_holidays()
+    print(output)
