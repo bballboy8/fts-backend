@@ -24,4 +24,4 @@ jobs:
       
     - name: SERVER and Logs
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME_WEBSOCKET }}@${{ secrets.HOST_WEBSOCKET }} 'cd /home/ubuntu/fts-backend && source venv/bin/activate && pm2 list && pm2 restart 0 && (setsid pm2 logs 0 &) && sleep 5 && pkill -f "pm2 logs 0"'
+        ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME_WEBSOCKET }}@${{ secrets.HOST_WEBSOCKET }} 'cd /home/ubuntu/fts-backend && source venv/bin/activate && pip install -r requirements.txt && pm2 list && pm2 restart 0 && (setsid pm2 logs 0 &) && sleep 5 && pkill -f "pm2 logs 0"'
