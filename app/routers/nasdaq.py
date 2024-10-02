@@ -4,8 +4,10 @@ import json
 import os
 import time
 import asyncpg
+from bs4 import BeautifulSoup
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+import requests
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers
 from fastapi import WebSocket
 from concurrent.futures import Future
@@ -90,6 +92,72 @@ class WebSocketManager:
                 print("found")
                 self.active_connections.remove(connection)
                 break
+
+
+HOLIDAY_URL = "https://www.nyse.com/markets/hours-calendars"
+
+
+def fetch_holidays():
+    try:
+        response = requests.get(HOLIDAY_URL)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching data: {e}")
+    # Parse the content using BeautifulSoup
+    soup = BeautifulSoup(response.content, "html.parser")
+    holidays = []
+    try:
+        # Locate the holiday table using the provided class name
+        holiday_table = soup.find(
+            "table", {"class": "table-data w-full table-fixed table-border-rows"}
+        )
+        if not holiday_table:
+            raise HTTPException(
+                status_code=500, detail="Holiday table not found on the page."
+            )
+        # Extract header and rows
+        headers = holiday_table.find("thead").find_all("td")
+        years = [
+            header.get_text(strip=True) for header in headers[1:]
+        ]  # Skip the first header, which is "Holiday"
+        rows = holiday_table.find("tbody").find_all("tr")
+        for row in rows:
+            columns = row.find_all("td")
+            holiday_name = columns[0].get_text(strip=True)
+            dates = [col.get_text(strip=True) for col in columns[1:]]
+            # Create a dictionary for each year with its corresponding holiday name and date
+            for year, date_str in zip(years, dates):
+                try:
+                    # Parse the date into a datetime object
+                    date_parts = date_str.split(",")
+                    month_day = (
+                        date_parts[1].strip().split("*")[0].split("(")[0]
+                    )  # Clean extra symbols like *, ()
+                    month, day = month_day.split(" ")
+                    # Construct the full date string
+                    full_date_str = f"{year} {month} {day.strip()}"
+                    date_time = datetime.strptime(full_date_str, "%Y %B %d")
+                    # Format the datetime object
+                    formatted_date_time = date_time.strftime("%Y-%m-%d")
+                except Exception:
+                    formatted_date_time = "Invalid Date Format"
+                holidays.append(
+                    {
+                        "year": year,
+                        "holiday_name": holiday_name,
+                        "date": date_str,
+                        "date_time": formatted_date_time,
+                    }
+                )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error parsing data: {e}")
+    return holidays
+
+
+@router.get("/holidays", response_model=list)
+def get_holidays():
+    holidays = fetch_holidays()
+    return holidays
 
 
 # manager = WebSocketManager()

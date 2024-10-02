@@ -34,7 +34,7 @@ async def fetch_all_data(
         logger.info("Acquired connection from pool")
 
         # Base query
-        query = "SELECT date, symbol, size, price FROM stock_data_partitioned WHERE msgType = 'T'"
+        query = "SELECT date, symbol, size, price FROM stock_data_partitioned WHERE msgType in ('T', 'h')"
         conditions = []
         values = []
 
