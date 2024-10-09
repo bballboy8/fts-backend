@@ -5,7 +5,7 @@ import dotenv
 import asyncpg
 import asyncio
 from datetime import datetime
-
+import pytz
 from fastapi import HTTPException
 
 from app.application_logger import get_logger
@@ -29,6 +29,12 @@ async def fetch_all_data(
     start_datetime: Optional[datetime],
 ):
     start_time = time.time()
+
+    # Calculate the current time in EST timezone
+    est_tz = pytz.timezone("US/Eastern")
+    current_est_time = datetime.now(est_tz)
+    formatted_est_time = current_est_time.strftime("%Y-%m-%dT%H:%M")
+
     async with pool.acquire() as conn:
         connection_acquire_time = time.time()
         logger.info("Acquired connection from pool")
@@ -44,6 +50,10 @@ async def fetch_all_data(
         if start_datetime:
             conditions.append(f"date >= ${len(values) + 1}::timestamp")
             values.append(start_datetime)
+
+        # Add condition to check that the date is <= current EST time
+        conditions.append(f"date <= ${len(values) + 1}::timestamp")
+        values.append(formatted_est_time)
 
         if conditions:
             query += " AND " + " AND ".join(conditions)
