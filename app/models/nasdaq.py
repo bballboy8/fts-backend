@@ -34,7 +34,7 @@ async def fetch_all_data(
     est_tz = pytz.timezone("US/Eastern")
     current_est_time = datetime.now(est_tz)
     formatted_est_time = current_est_time.strftime("%Y-%m-%dT%H:%M")
-
+    est_time = datetime.strptime(formatted_est_time, "%Y-%m-%dT%H:%M")
     async with pool.acquire() as conn:
         connection_acquire_time = time.time()
         logger.info("Acquired connection from pool")
@@ -53,7 +53,7 @@ async def fetch_all_data(
 
         # Add condition to check that the date is <= current EST time
         conditions.append(f"date <= ${len(values) + 1}::timestamp")
-        values.append(formatted_est_time)
+        values.append(est_time)
 
         if conditions:
             query += " AND " + " AND ".join(conditions)
