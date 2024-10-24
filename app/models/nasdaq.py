@@ -33,14 +33,14 @@ async def fetch_all_data(
     # Calculate the current time in EST timezone
     est_tz = pytz.timezone("US/Eastern")
     current_est_time = datetime.now(est_tz)
-    formatted_est_time = current_est_time.strftime("%Y-%m-%dT%H:%M")
-    est_time = datetime.strptime(formatted_est_time, "%Y-%m-%dT%H:%M")
+    formatted_est_time = current_est_time.strftime("%Y-%m-%dT%H:%M:%S")
+    est_time = datetime.strptime(formatted_est_time, "%Y-%m-%dT%H:%M:%S")
     async with pool.acquire() as conn:
         connection_acquire_time = time.time()
         logger.info("Acquired connection from pool")
 
         # Base query
-        query = "SELECT date, symbol, size, price FROM stock_data_partitioned WHERE msgType in ('T', 'h')"
+        query = "SELECT date, symbol, size, price FROM stock_data_partitioned WHERE msgType in ('T', 'H')"
         conditions = []
         values = []
 

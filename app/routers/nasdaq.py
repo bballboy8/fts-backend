@@ -211,7 +211,9 @@ async def get_nasdaq_data_by_date(request: Request):
 
     logger.info("Starting get_nasdaq_data_by_date...")
     start_datetime = (
-        datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M") if start_datetime else None
+        datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M:%S")
+        if start_datetime
+        else None
     )
 
     pool = await asyncpg.create_pool(
