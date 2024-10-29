@@ -5,7 +5,7 @@ import os
 import time
 import asyncpg
 from bs4 import BeautifulSoup
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 from fastapi.responses import StreamingResponse
 import requests
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers
@@ -238,10 +238,9 @@ async def get_nasdaq_data_by_date(request: Request):
         fetch_end_time = time.time()
         logger.info(f"Data fetched in {fetch_end_time - fetch_start_time:.2f} seconds")
 
-        # Check if no records are returned
         if not records:
             logger.info("No records found")
-            return HTTPException(status_code=204, detail="No data found")
+            return Response(status_code=204)  # Return 204 No Content
 
         serialize_start_time = time.time()
         logger.info("Returning records")
