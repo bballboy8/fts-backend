@@ -9,9 +9,6 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import StreamingResponse
 import requests
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers
-from fastapi import WebSocket
-from concurrent.futures import Future
-from threading import Thread
 from app.application_logger import get_logger
 import pytz
 from datetime import datetime
@@ -39,59 +36,29 @@ db_params = {
 }
 
 
-def call_with_future(fn, future, args, kwargs):
-    try:
-        result = fn(*args, **kwargs)
-        future.set_result(result)
-    except Exception as exc:
-        future.set_exception(exc)
+db_pool = None
 
 
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        future = Future()
-        Thread(target=call_with_future, args=(fn, future, args, kwargs)).start()
-        return future
+async def init_db_pool():
+    global db_pool
+    db_pool = await asyncpg.create_pool(
+        database=db_params["dbname"],
+        user=db_params["user"],
+        password=db_params["password"],
+        host=db_params["host"],
+        port=db_params["port"],
+        max_size=100,
+    )
 
-    return wrapper
+
+@router.on_event("startup")
+async def startup_event():
+    await init_db_pool()
 
 
-class WebSocketManager:
-    """Class defining socket events"""
-
-    def __init__(self):
-        """init method, keeping track of connections"""
-        self.active_connections = []
-        self.isRunning = False
-
-    async def connect(self, websocket: WebSocket):
-        """connect event"""
-        await websocket.accept()
-        self.active_connections.append({"isRunning": False, "socket": websocket})
-
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        """Direct Message"""
-        await websocket.send_text(message)
-
-    def startStream(self, websocket: WebSocket):
-        for idx, connection in enumerate(self.active_connections):
-            if connection["socket"] == websocket:
-                self.active_connections[idx]["isRunning"] = True
-                break
-
-    def stopStream(self, websocket: WebSocket):
-        for idx, connection in enumerate(self.active_connections):
-            if connection["socket"] == websocket:
-                self.active_connections[idx]["isRunning"] = False
-                break
-
-    def disconnect(self, websocket: WebSocket):
-        """disconnect event"""
-        for connection in self.active_connections:
-            if connection["socket"] == websocket:
-                print("found")
-                self.active_connections.remove(connection)
-                break
+@router.on_event("shutdown")
+async def shutdown_event():
+    await db_pool.close()
 
 
 HOLIDAY_URL = "https://www.nyse.com/markets/hours-calendars"
@@ -160,26 +127,6 @@ def get_holidays():
     return holidays
 
 
-# manager = WebSocketManager()
-
-
-# @router.websocket("/get_real_data")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await manager.connect(websocket)
-#     try:
-#         while True:
-#             data = await websocket.receive_text()
-#             if data == "start":
-#                 manager.startStream(websocket)
-#             elif data == "stop":
-#                 manager.stopStream(websocket)
-#             await manager.send_personal_message(f"Received:{data}", websocket)
-#     except WebSocketDisconnect:
-#         print("disconnected")
-#         manager.disconnect(websocket)
-#         # await manager.send_personal_message("Bye!!!", websocket)
-
-
 async def async_record_generator(records):
     for record in records:
         record_dict = dict(record)
@@ -201,6 +148,20 @@ async def async_compressed_record_generator(
         yield chunk
 
 
+def parse_date(date_string):
+    """Parse date with multiple format options."""
+    date_formats = ["%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"]
+
+    for fmt in date_formats:
+        try:
+            return datetime.strptime(date_string, fmt)
+        except ValueError:
+            continue  # Try the next format
+
+    logger.error("Date parsing error: invalid date format")
+    return None  # Return None if no format matched
+
+
 @router.post("/get_data")
 async def get_nasdaq_data_by_date(request: Request):
     start_time = time.time()
@@ -209,158 +170,60 @@ async def get_nasdaq_data_by_date(request: Request):
     symbol = body.get("symbol")
     start_datetime = body.get("start_datetime")
 
-    logger.info("Starting get_nasdaq_data_by_date...")
-    try:
-        start_datetime = (
-            datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M:%S")
-            if start_datetime
-            else None
-        )
-    except Exception:
-        start_datetime = (
-            datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
-            if start_datetime
-            else None
-        )
-
-    pool = await asyncpg.create_pool(
-        database=db_params["dbname"],
-        user=db_params["user"],
-        password=db_params["password"],
-        host=db_params["host"],
-        port=db_params["port"],
+    logger.info(
+        f"Starting get_nasdaq_data_by_date... - symbol {symbol} - start_datetime {start_datetime} "
     )
+    # Parse date with improved exception handling
+    start_datetime = parse_date(start_datetime)
+    if start_datetime is None:
+        return Response(status_code=400, content="Invalid date format")
 
-    try:
-        fetch_start_time = time.time()
-        logger.info("Fetching data")
-        records = await fetch_all_data(pool, symbol, start_datetime)
-        fetch_end_time = time.time()
-        logger.info(f"Data fetched in {fetch_end_time - fetch_start_time:.2f} seconds")
+    async with db_pool.acquire() as connection:
+        try:
+            fetch_start_time = time.time()
+            logger.info("Fetching data")
+            records = await fetch_all_data(connection, symbol, start_datetime)
+            fetch_end_time = time.time()
+            logger.info(
+                f"Data fetched in {fetch_end_time - fetch_start_time:.2f} seconds"
+            )
 
-        if not records:
-            logger.info("No records found")
-            return Response(status_code=204)  # Return 204 No Content
+            if not records:
+                logger.info("No records found")
+                return Response(status_code=204)  # Return 204 No Content
 
-        serialize_start_time = time.time()
-        logger.info("Returning records")
-        chunk_size = 65536  # Adjust chunk size if necessary
-        compression_level = 1  # Lower compression level for faster compression
-        response = StreamingResponse(
-            async_compressed_record_generator(
-                records, chunk_size=chunk_size, compression_level=compression_level
-            ),
-            media_type="application/json",
-            headers={"Content-Encoding": "gzip", "Transfer-Encoding": "chunked"},
-        )
-        serialize_end_time = time.time()
-        logger.info(
-            f"Data serialized and compressed in {serialize_end_time - serialize_start_time:.2f} seconds"
-        )
+            serialize_start_time = time.time()
+            logger.info(
+                f"Returning records - symbol {symbol} - start_datetime {start_datetime}"
+            )
+            chunk_size = 65536  # Adjust chunk size if necessary
+            compression_level = 1  # Lower compression level for faster compression
+            response = StreamingResponse(
+                async_compressed_record_generator(
+                    records, chunk_size=chunk_size, compression_level=compression_level
+                ),
+                media_type="application/json",
+                headers={"Content-Encoding": "gzip", "Transfer-Encoding": "chunked"},
+            )
+            serialize_end_time = time.time()
+            logger.info(
+                f"Data serialized and compressed in {serialize_end_time - serialize_start_time:.2f} seconds - symbol {symbol} - start_datetime {start_datetime}"
+            )
 
-        return response
-    finally:
-        await pool.close()
-        end_time = time.time()
-        logger.info(f"Total time taken: {end_time - start_time:.2f} seconds")
+            return response
+        except Exception as e:
+            logger.error(
+                f"Error during data fetch or response preparation - symbol {symbol} - start_datetime {start_datetime}: {e}"
+            )
+            return Response(status_code=500, content="Server error")
+        finally:
+            end_time = time.time()
+            logger.info(
+                f"Total time taken: {end_time - start_time:.2f} seconds - symbol {symbol} - start_datetime {start_datetime}"
+            )
 
 
 @router.get("/get_tickers")
 async def get_tickers():
     records = await fetch_all_tickers()
     return records
-
-
-# def makeRespFromKafkaMessages(messages):
-#     resp = {"headers": ["trackingID", "date", "msgType", "symbol", "price"], "data": []}
-#     for message in messages:
-#         msg = message.value()
-#         resp["data"].append(
-#             (
-#                 [
-#                     int(msg["trackingID"]),
-#                     str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
-#                     msg["msgType"],
-#                     msg["symbol"] if "symbol" in msg else "",
-#                     int(msg["price"]) if "price" in msg else -1,
-#                 ]
-#             )
-#         )
-#     return resp
-
-#
-# def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
-#     # Ensure the tracking ID is a string of digits
-#     if not tracking_id.isdigit() or len(tracking_id) != 14:
-#         raise ValueError("Invalid tracking ID format")
-#
-#     # Extract bytes 2-7, which represent the timestamp (6 bytes in this case)
-#     timestamp_bytes = tracking_id[:]
-#
-#     # Convert the extracted bytes to an integer representing nanoseconds from midnight
-#     nanoseconds_from_midnight = int(timestamp_bytes)
-#
-#     # Calculate the time of day from the nanoseconds
-#     seconds_from_midnight = nanoseconds_from_midnight / 1e9
-#     time_of_day = timedelta(seconds=seconds_from_midnight)
-#
-#     # Assume the date is today for simplicity, adjust as needed
-#     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-#
-#     # Add the time of day to the current date
-#     timestamp = today + time_of_day
-#
-#     return timestamp
-#
-
-# def init_nasdaq_kafka_connection():
-#     print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
-#     security_cfg = {
-#         "oauth.token.endpoint.uri": os.getenv("NASDAQ_KAFKA_ENDPOINT"),
-#         "oauth.client.id": os.getenv("NASDAQ_KAFKA_CLIENT_ID"),
-#         "oauth.client.secret": os.getenv("NASDAQ_KAFKA_CLIENT_SECRET"),
-#     }
-#     kafka_cfg = {
-#         "bootstrap.servers": os.getenv("NASDAQ_KAFKA_BOOTSTRAP_URL"),
-#         # "bootstrap.servers": "{streams_endpoint_url}:9094",
-#         "auto.offset.reset": "latest",
-#     }
-
-#     ncds_client = NCDSClient(security_cfg, kafka_cfg)
-#     topic = "NLSUTP"
-#     consumer = ncds_client.ncds_kafka_consumer(topic)
-#     logger.info(f"Success to connect NASDAQ Kafka server.")
-#     return consumer
-#     # print(messages)
-
-
-# async def listen_message_from_nasdaq_kafka(consumer):
-#     while True:
-#         messages = consumer.consume(num_messages=2000, timeout=10)
-#         response = makeRespFromKafkaMessages(messages)
-#         # print(len(manager.active_connections))
-#         for idx, connection in enumerate(manager.active_connections):
-#             if connection["isRunning"]:
-#                 webSocket = connection["socket"]
-#                 try:
-#                     await webSocket.send_json(response)
-#                 except Exception as e:
-#                     logger.error(
-#                         f"Error occured while sending data to client: {e}",
-#                         exc_info=True,
-#                     )
-
-
-# consumer = init_nasdaq_kafka_connection()
-
-
-# def between_callback():
-#     loop = asyncio.new_event_loop()
-#     asyncio.set_event_loop(loop)
-
-#     loop.run_until_complete(listen_message_from_nasdaq_kafka(consumer))
-#     loop.close()
-
-
-# nasdaq_kafka_thread = Thread(target=between_callback)
-# nasdaq_kafka_thread.start()
