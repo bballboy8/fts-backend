@@ -196,6 +196,7 @@ class UserLogin(BaseModel):
 
     email: str
     password: str
+    current_version: str
 
 
 class UserLogout(BaseModel):

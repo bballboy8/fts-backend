@@ -68,6 +68,29 @@ async def create_users_table():
         await conn.close()
 
 
+async def update_user_field(email, field, value):
+    conn = await asyncpg.connect(**db_params)
+
+    try:
+        # Check if the user exists
+        exists = await check_user_exists(email, conn)
+        if not exists:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Dynamically construct the SQL query for updating the specified field
+        query = f"UPDATE users SET {field} = $1 WHERE email = $2"
+
+        # Execute the update query with the specified value and email
+        await conn.execute(query, value, email)
+
+        logger.info(f"User {email} updated successfully - {field} set to {value}")
+    except Exception as e:
+        logger.error(f"Error updating user {email} field '{field}': {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await conn.close()
+
+
 async def save_user(user_data):
     conn = await asyncpg.connect(**db_params)
 
@@ -149,6 +172,23 @@ async def get_user(email):
         return dict(result) if result else None
     except Exception as e:
         logger.error(f"Error retrieving user: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await conn.close()
+
+
+async def get_current_version():
+    conn = await asyncpg.connect(**db_params)
+
+    try:
+        query = "SELECT version, breaking_change FROM versions ORDER BY auto_creation_date DESC LIMIT 1"
+        result = await conn.fetchrow(query)
+        logger.info(
+            "Most recent version and breaking change status retrieved successfully"
+        )
+        return dict(result) if result else None
+    except Exception as e:
+        logger.error(f"Error retrieving the most recent version: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await conn.close()
