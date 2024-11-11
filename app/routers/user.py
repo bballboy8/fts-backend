@@ -3,8 +3,10 @@ from fastapi.responses import JSONResponse
 from app.auth.hashing import get_password_hash, verify_password
 from app.auth.authentication import create_access_token
 from app.models.user import (
+    get_current_version,
     save_user,
     get_user,
+    update_user_field,
     update_user_settings,
 )  # , get_all_user_settings, get_all_users
 from app.schemas.user import (
@@ -69,20 +71,76 @@ async def signup(user_in: UserSignUp):
 
 @router.post("/login/")
 async def login(user_login: UserLogin):
-    # check if user is in database (simple for now)
+    # check if user is in the database
     user = await get_user(user_login.email)
 
-    # check if password is correct (done on frontend for now)
+    # check if user exists
     if not user:
         logger.error(f"User {user_login.email} not found", exc_info=True)
         raise HTTPException(status_code=400, detail="User not found")
 
+    # check if password is correct
     if not verify_password(user_login.password, user["hashed_password"]):
         logger.error(f"User {user_login.email} incorrect password", exc_info=True)
         raise HTTPException(status_code=400, detail="Incorrect Password")
 
+    # check if user is already logged in
+    if user.get("currently_logged_in"):
+        logger.error(f"User {user_login.email} is already logged in", exc_info=True)
+        raise HTTPException(status_code=400, detail="User is already logged in")
+
+    # get the current version and breaking change status
+    current_version_data = await get_current_version()
+    current_version = (
+        current_version_data.get("version") if current_version_data else None
+    )
+    breaking_change = (
+        current_version_data.get("breaking_change") if current_version_data else False
+    )
+
+    # check if user's version is up-to-date
+    if user_login.current_version != current_version:
+        if breaking_change:
+            logger.error(
+                f"User {user_login.email} has an old version with breaking changes",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="A breaking change requires updating to the latest version",
+            )
+        else:
+            logger.warning(
+                f"User {user_login.email} is not on the latest version", exc_info=True
+            )
+            # Proceed with login but add a warning in the response
+            access_token = create_access_token(data={"sub": user_login.email})
+            message = f"User {user_login.email} logged in successfully, but is on an outdated version"
+
+            # Update the current_version in the database
+            await update_user_field(
+                user_login.email, "current_version", user_login.current_version
+            )
+            await update_user_field(user_login.email, "currently_logged_in", True)
+
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "message": message,
+                "warning": "You are not on the latest version. Please consider updating.",
+            }
+
+    # proceed with login if all checks are passed
     access_token = create_access_token(data={"sub": user_login.email})
     message = f"User {user_login.email} logged in successfully"
+    logger.info(message)
+
+    # Update the current_version in the database
+    await update_user_field(
+        user_login.email, "current_version", user_login.current_version
+    )
+    await update_user_field(user_login.email, "currently_logged_in", True)
+
     return {"access_token": access_token, "token_type": "bearer", "message": message}
 
 
@@ -110,6 +168,8 @@ async def logout(request: UserLogout):
     if not user:
         logger.error(f"User {request.email} not found to logout", exc_info=True)
         raise HTTPException(status_code=400, detail="User not found")
+
+    await update_user_field(request.email, "currently_logged_in", False)
 
     return {"message": f"{request.email} logged out successfully"}
 
