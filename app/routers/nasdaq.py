@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import StreamingResponse
 import requests
-from app.models.nasdaq import fetch_all_data, fetch_all_tickers
+from app.models.nasdaq import fetch_all_data, fetch_all_tickers, is_ticker_valid
 from app.application_logger import get_logger
 import pytz
 from datetime import datetime
@@ -227,3 +227,8 @@ async def get_nasdaq_data_by_date(request: Request):
 async def get_tickers():
     records = await fetch_all_tickers()
     return records
+
+
+@router.get("/is_ticker_valid")
+async def ticker_valid(ticker: str):
+    return is_ticker_valid(ticker)
