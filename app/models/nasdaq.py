@@ -111,6 +111,34 @@ async def fetch_all_tickers():
     return records
 
 
+async def is_ticker_valid(ticker):
+    conn = await asyncpg.connect(
+        database=db_params["dbname"],
+        user=db_params["user"],
+        password=db_params["password"],
+        host=db_params["host"],
+        port=db_params["port"],
+    )
+
+    # Base query
+    query = (
+        f"select symbol from stock_data_partitioned where symbol = '{ticker}' limit 1"
+    )
+
+    logger.info(f"Executing query: {query}")
+
+    try:
+        # Execute the query with the values
+        records = await conn.fetch(query)
+    except Exception as e:
+        logger.error(f"Error executing query: {e}", exc_info=True)
+        raise
+    finally:
+        await conn.close()
+
+    return True if records else False
+
+
 # Example usage
 if __name__ == "__main__":
     asyncio.run(fetch_all_data(symbol=None, start_datetime="2023-06-19 14:30:00"))
