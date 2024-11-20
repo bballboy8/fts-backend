@@ -35,7 +35,6 @@ db_params = {
     "port": "5432",
 }
 
-
 db_pool = None
 
 
@@ -231,4 +230,5 @@ async def get_tickers():
 
 @router.get("/is_ticker_valid")
 async def ticker_valid(ticker: str):
-    return is_ticker_valid(ticker)
+    valid = await is_ticker_valid(ticker)
+    return valid
