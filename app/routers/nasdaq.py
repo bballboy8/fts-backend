@@ -8,14 +8,7 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import StreamingResponse
 import requests
-<<<<<<< HEAD
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers, is_ticker_valid
-from fastapi import WebSocket
-from concurrent.futures import Future
-from threading import Thread
-=======
-from app.models.nasdaq import fetch_all_data, fetch_all_tickers
->>>>>>> 8009164df68f78fe33bdc988b2642a1675f8d712
 from app.application_logger import get_logger
 import pytz
 from datetime import datetime
@@ -234,7 +227,6 @@ async def get_nasdaq_data_by_date(request: Request):
 async def get_tickers():
     records = await fetch_all_tickers()
     return records
-<<<<<<< HEAD
 
 
 @router.get("/is_ticker_valid")
@@ -335,5 +327,3 @@ async def ticker_valid(ticker: str):
 
 # nasdaq_kafka_thread = Thread(target=between_callback)
 # nasdaq_kafka_thread.start()
-=======
->>>>>>> 8009164df68f78fe33bdc988b2642a1675f8d712
