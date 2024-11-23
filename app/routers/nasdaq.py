@@ -246,6 +246,10 @@ def makeRespFromKafkaMessages(messages):
         # Determine the color based on the msgType and price
         if msg_type == "H":
             color = "yellow"
+            if symbol in latest_prices:
+                price = latest_prices[symbol]
+            else:
+                color = "black"
         else:
             if symbol in latest_prices:
                 if price > latest_prices[symbol]:
