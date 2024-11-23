@@ -33,6 +33,9 @@ send_dummy_data = os.getenv("SEND_DUMMY_DATA", "true") == "true"
 
 HOLIDAY_URL = "https://www.nyse.com/markets/hours-calendars"
 
+# Dictionary to track the latest price for each symbol
+latest_prices = {}
+
 
 def fetch_holidays():
     try:
@@ -233,9 +236,6 @@ def makeRespFromKafkaMessages(messages):
         ],
         "data": [],
     }
-
-    # Dictionary to track the latest price for each symbol
-    latest_prices = {}
 
     for message in messages:
         msg = message.value()
