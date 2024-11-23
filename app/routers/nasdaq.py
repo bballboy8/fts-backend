@@ -219,19 +219,10 @@ async def get_connections_cta():
 def makeRespFromKafkaMessages(messages):
     resp = {
         "headers": [
-            "trackingID",
             "date",
-            "msgType",
             "symbol",
             "price",
-            "soup_partition",
-            "soup_sequence",
-            "market_center",
-            "security_class",
-            "control_number",
             "size",
-            "sale_condition",
-            "consolidated_volume",
             "color",  # Adding the new field
         ],
         "data": [],
@@ -269,19 +260,11 @@ def makeRespFromKafkaMessages(messages):
         if color != "black":
             resp["data"].append(
                 [
-                    int(msg["trackingID"]),
                     str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
                     msg_type,
                     symbol,
                     price,
-                    msg.get("SoupPartition"),
-                    msg.get("SoupSequence"),
-                    msg.get("marketCenter"),
-                    msg.get("securityClass"),
-                    msg.get("controlNumber"),
                     msg.get("size"),
-                    msg.get("saleCondition"),
-                    msg.get("cosolidatedVolume"),
                     color,
                 ]
             )
