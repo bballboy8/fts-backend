@@ -196,7 +196,9 @@ async def get_nasdaq_data_by_date(request: Request):
 
             for i, record in enumerate(records):
                 if record.get("msgtype") == "H":
-                    record["color"] = "yellow"
+                    if i != 0:
+                        record["color"] = "yellow"
+                        record["price"] = records[i - 1]["price"]
                 elif i > 0:
                     if record["price"] > records[i - 1]["price"]:
                         record["color"] = "green"
