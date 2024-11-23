@@ -229,30 +229,58 @@ def makeRespFromKafkaMessages(messages):
             "size",
             "sale_condition",
             "consolidated_volume",
+            "color",  # Adding the new field
         ],
         "data": [],
     }
+
+    # Dictionary to track the latest price for each symbol
+    latest_prices = {}
+
     for message in messages:
         msg = message.value()
+        symbol = msg["symbol"] if "symbol" in msg else ""
+        price = int(msg["price"]) if "price" in msg else -1
+        msg_type = msg["msgType"]
+
+        # Determine the color based on the msgType and price
+        if msg_type == "H":
+            color = "yellow"
+        else:
+            if symbol in latest_prices:
+                if price > latest_prices[symbol]:
+                    color = "green"
+                elif price < latest_prices[symbol]:
+                    color = "red"
+                else:
+                    color = "green"  # Default for unchanged price
+            else:
+                color = "black"  # Default for first occurrence of symbol
+
+        # Update the latest price for the symbol
+        if price != -1:
+            latest_prices[symbol] = price
+
+        # Add the record to the response
         resp["data"].append(
-            (
-                [
-                    int(msg["trackingID"]),
-                    str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
-                    msg["msgType"],
-                    msg["symbol"] if "symbol" in msg else "",
-                    int(msg["price"]) if "price" in msg else -1,
-                    msg.get("SoupPartition"),
-                    msg.get("SoupSequence"),
-                    msg.get("marketCenter"),
-                    msg.get("securityClass"),
-                    msg.get("controlNumber"),
-                    msg.get("size"),
-                    msg.get("saleCondition"),
-                    msg.get("cosolidatedVolume"),
-                ]
-            )
+            [
+                int(msg["trackingID"]),
+                str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
+                msg_type,
+                symbol,
+                price,
+                msg.get("SoupPartition"),
+                msg.get("SoupSequence"),
+                msg.get("marketCenter"),
+                msg.get("securityClass"),
+                msg.get("controlNumber"),
+                msg.get("size"),
+                msg.get("saleCondition"),
+                msg.get("cosolidatedVolume"),
+                color,
+            ]
         )
+
     return resp
 
 
