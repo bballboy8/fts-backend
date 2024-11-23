@@ -249,7 +249,7 @@ def makeRespFromKafkaMessages(messages):
             if symbol in latest_prices:
                 price = latest_prices[symbol]
             else:
-                color = "black"
+                color = "black"  # Default for first occurrence of symbol
         else:
             if symbol in latest_prices:
                 if price > latest_prices[symbol]:
@@ -266,24 +266,25 @@ def makeRespFromKafkaMessages(messages):
             latest_prices[symbol] = price
 
         # Add the record to the response
-        resp["data"].append(
-            [
-                int(msg["trackingID"]),
-                str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
-                msg_type,
-                symbol,
-                price,
-                msg.get("SoupPartition"),
-                msg.get("SoupSequence"),
-                msg.get("marketCenter"),
-                msg.get("securityClass"),
-                msg.get("controlNumber"),
-                msg.get("size"),
-                msg.get("saleCondition"),
-                msg.get("cosolidatedVolume"),
-                color,
-            ]
-        )
+        if color != "black":
+            resp["data"].append(
+                [
+                    int(msg["trackingID"]),
+                    str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
+                    msg_type,
+                    symbol,
+                    price,
+                    msg.get("SoupPartition"),
+                    msg.get("SoupSequence"),
+                    msg.get("marketCenter"),
+                    msg.get("securityClass"),
+                    msg.get("controlNumber"),
+                    msg.get("size"),
+                    msg.get("saleCondition"),
+                    msg.get("cosolidatedVolume"),
+                    color,
+                ]
+            )
 
     return resp
 
