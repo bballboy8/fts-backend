@@ -33,6 +33,9 @@ send_dummy_data = os.getenv("SEND_DUMMY_DATA", "true") == "true"
 
 HOLIDAY_URL = "https://www.nyse.com/markets/hours-calendars"
 
+# Dictionary to track the latest price for each symbol
+latest_prices = {}
+
 
 def fetch_holidays():
     try:
@@ -216,43 +219,56 @@ async def get_connections_cta():
 def makeRespFromKafkaMessages(messages):
     resp = {
         "headers": [
-            "trackingID",
             "date",
-            "msgType",
             "symbol",
             "price",
-            "soup_partition",
-            "soup_sequence",
-            "market_center",
-            "security_class",
-            "control_number",
             "size",
-            "sale_condition",
-            "consolidated_volume",
+            "color",  # Adding the new field
         ],
         "data": [],
     }
+
     for message in messages:
         msg = message.value()
-        resp["data"].append(
-            (
+        symbol = msg["symbol"] if "symbol" in msg else ""
+        price = int(msg["price"]) if "price" in msg else -1
+        msg_type = msg["msgType"]
+
+        # Determine the color based on the msgType and price
+        if msg_type == "H":
+            color = "yellow"
+            if symbol in latest_prices:
+                price = latest_prices[symbol]
+            else:
+                color = "black"  # Default for first occurrence of symbol
+        else:
+            if symbol in latest_prices:
+                if price > latest_prices[symbol]:
+                    color = "green"
+                elif price < latest_prices[symbol]:
+                    color = "red"
+                else:
+                    color = "green"  # Default for unchanged price
+            else:
+                color = "black"  # Default for first occurrence of symbol
+
+        # Update the latest price for the symbol
+        if price != -1:
+            latest_prices[symbol] = price
+
+        # Add the record to the response
+        if color != "black":
+            resp["data"].append(
                 [
-                    int(msg["trackingID"]),
                     str(convert_tracking_id_to_timestamp(str(msg["trackingID"]))),
-                    msg["msgType"],
-                    msg["symbol"] if "symbol" in msg else "",
-                    int(msg["price"]) if "price" in msg else -1,
-                    msg.get("SoupPartition"),
-                    msg.get("SoupSequence"),
-                    msg.get("marketCenter"),
-                    msg.get("securityClass"),
-                    msg.get("controlNumber"),
+                    msg_type,
+                    symbol,
+                    price,
                     msg.get("size"),
-                    msg.get("saleCondition"),
-                    msg.get("cosolidatedVolume"),
+                    color,
                 ]
             )
-        )
+
     return resp
 
 
