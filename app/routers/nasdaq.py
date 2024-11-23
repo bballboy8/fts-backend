@@ -191,6 +191,25 @@ async def get_nasdaq_data_by_date(request: Request):
                 logger.info("No records found")
                 return Response(status_code=204)  # Return 204 No Content
 
+            # Convert asyncpg.Record to dictionaries and add the `color` field
+            records = [dict(record) for record in records]
+
+            for i, record in enumerate(records):
+                if record.get("msgtype") == "H":
+                    if i != 0:
+                        record["color"] = "yellow"
+                        record["price"] = records[i - 1]["price"]
+                elif i > 0:
+                    if record["price"] > records[i - 1]["price"]:
+                        record["color"] = "green"
+                    elif record["price"] < records[i - 1]["price"]:
+                        record["color"] = "red"
+                    else:
+                        record["color"] = "green"  # Optional for unchanged price
+                else:
+                    record["color"] = "black"  # First record has no prior comparison
+                del record["msgtype"]
+
             serialize_start_time = time.time()
             logger.info(
                 f"Returning records - symbol {symbol} - start_datetime {start_datetime}"
