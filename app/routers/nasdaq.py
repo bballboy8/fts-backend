@@ -205,7 +205,7 @@ async def get_nasdaq_data_by_date(request: Request):
                     else:
                         record["color"] = "green"  # Optional for unchanged price
                 else:
-                    record["color"] = "gray"  # First record has no prior comparison
+                    record["color"] = "black"  # First record has no prior comparison
 
             serialize_start_time = time.time()
             logger.info(
