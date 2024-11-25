@@ -1,3 +1,4 @@
+import traceback
 import gzip
 import io
 import json
@@ -168,10 +169,12 @@ async def get_nasdaq_data_by_date(request: Request):
     body = await request.json()
     symbol = body.get("symbol")
     start_datetime = body.get("start_datetime")
-
+    last_price = body.get("last_price")
+    last_size = body.get("last_size", 0)  # Default size to 0 if not provided
     logger.info(
         f"Starting get_nasdaq_data_by_date... - symbol {symbol} - start_datetime {start_datetime} "
     )
+
     # Parse date with improved exception handling
     start_datetime = parse_date(start_datetime)
     if start_datetime is None:
@@ -194,21 +197,53 @@ async def get_nasdaq_data_by_date(request: Request):
             # Convert asyncpg.Record to dictionaries and add the `color` field
             records = [dict(record) for record in records]
 
+            # Initialize last_price and last_size for the first record if it exists
+            if last_price and records[0]["price"]:
+                records[0]["color"] = (
+                    "green" if records[0]["price"] > last_price else "red"
+                )
+
+            # Iterate through the records
             for i, record in enumerate(records):
+                current_price = record.get("price")
+                current_size = record.get("size")
+
+                # If current price is None, use last_price or previous point's price
+                if current_price is None:
+                    current_price = (
+                        last_price
+                        if last_price is not None
+                        else (records[i - 1]["price"] if i > 0 else None)
+                    )
+                    record["price"] = current_price  # Update the price to current_price
+
+                # If current size is None, use last_size
+                if current_size is None:
+                    current_size = last_size if last_size is not None else 0
+                    record["size"] = current_size  # Update the size to current_size
+
+                # Update last_price and last_size to the current values for next iteration
+                last_price = current_price
+                last_size = current_size
+
+                # Handle "msgtype" == "H" condition separately
                 if record.get("msgtype") == "H":
-                    if i != 0:
-                        record["color"] = "yellow"
-                        record["price"] = records[i - 1]["price"]
-                elif i > 0:
-                    if record["price"] > records[i - 1]["price"]:
-                        record["color"] = "green"
-                    elif record["price"] < records[i - 1]["price"]:
-                        record["color"] = "red"
-                    else:
-                        record["color"] = "green"  # Optional for unchanged price
+                    record["color"] = "yellow"
                 else:
-                    record["color"] = "black"  # First record has no prior comparison
-                del record["msgtype"]
+                    previous_point = records[i - 1].get("price") if i > 0 else None
+
+                    # Use last_price or previous_point for price comparison
+                    if current_price is not None and previous_point is not None:
+                        if current_price > previous_point:
+                            record["color"] = "green"
+                        elif current_price < previous_point:
+                            record["color"] = "red"
+                        else:
+                            record["color"] = "green"  # Optional for unchanged price
+                    else:
+                        record["color"] = "black"  # No price data for both
+
+                del record["msgtype"]  # Remove msgtype after processing
 
             serialize_start_time = time.time()
             logger.info(
@@ -230,9 +265,11 @@ async def get_nasdaq_data_by_date(request: Request):
 
             return response
         except Exception as e:
+            # Log the full exception with traceback
             logger.error(
-                f"Error during data fetch or response preparation - symbol {symbol} - start_datetime {start_datetime}: {e}"
+                f"Error during data fetch or response preparation - symbol {symbol} - start_datetime {start_datetime}: {str(e)}"
             )
+            logger.error(f"Full exception traceback: {traceback.format_exc()}")
             return Response(status_code=500, content="Server error")
         finally:
             end_time = time.time()

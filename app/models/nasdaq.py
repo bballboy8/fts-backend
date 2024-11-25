@@ -4,7 +4,7 @@ from typing import Optional
 import dotenv
 import asyncpg
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from fastapi import HTTPException
 
@@ -33,8 +33,31 @@ async def fetch_all_data(
     # Calculate the current time in EST timezone
     est_tz = pytz.timezone("US/Eastern")
     current_est_time = datetime.now(est_tz)
-    formatted_est_time = current_est_time.strftime("%Y-%m-%dT%H:%M:%S")
-    est_time = datetime.strptime(formatted_est_time, "%Y-%m-%dT%H:%M:%S")
+
+    # Check if current time is during the weekend or outside market hours (4 AM to 8 PM)
+    if (
+        current_est_time.weekday() >= 5
+        or current_est_time.hour < 4
+        or current_est_time.hour >= 20
+    ):
+        # If it's the weekend or outside market hours, set to the last working day's 8 PM
+        # Go back to the previous Friday if it's the weekend
+        if current_est_time.weekday() == 5:  # Saturday
+            last_working_day = current_est_time - timedelta(days=1)  # Friday
+        elif current_est_time.weekday() == 6:  # Sunday
+            last_working_day = current_est_time - timedelta(days=2)  # Friday
+        else:  # Outside market hours, adjust to 8 PM the same day
+            last_working_day = current_est_time
+
+        # Set time to 8 PM
+        est_time = last_working_day.replace(hour=20, minute=0, second=0, microsecond=0)
+        # Otherwise, use the current EST time
+        formatted_est_time = est_time.strftime("%Y-%m-%dT%H:%M:%S")
+        est_time = datetime.strptime(formatted_est_time, "%Y-%m-%dT%H:%M:%S")
+    else:
+        # Otherwise, use the current EST time
+        formatted_est_time = current_est_time.strftime("%Y-%m-%dT%H:%M:%S")
+        est_time = datetime.strptime(formatted_est_time, "%Y-%m-%dT%H:%M:%S")
 
     connection_acquire_time = time.time()
     logger.info("Acquired connection from pool")
