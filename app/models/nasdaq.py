@@ -93,15 +93,7 @@ async def fetch_all_data(
         logger.info(f"Total fetch_all_data time: {end_time - start_time:.2f} seconds")
 
 
-async def fetch_all_tickers():
-    conn = await asyncpg.connect(
-        database=db_params["dbname"],
-        user=db_params["user"],
-        password=db_params["password"],
-        host=db_params["host"],
-        port=db_params["port"],
-    )
-
+async def fetch_all_tickers(conn):
     # Base query
     query = "select * from mv_stock_data_symbol_count"
 

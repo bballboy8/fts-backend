@@ -3,145 +3,143 @@ import io
 import json
 import os
 import time
+import asyncio
+from typing import Optional, List, Dict, Any
+from contextlib import asynccontextmanager
+
 import asyncpg
 from bs4 import BeautifulSoup
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Response, HTTPException
 from fastapi.responses import StreamingResponse
 import requests
+from pydantic import BaseModel, Field
+from datetime import datetime, date
+import pytz
+
 from app.models.nasdaq import fetch_all_data, fetch_all_tickers, is_ticker_valid
 from app.application_logger import get_logger
-import pytz
-from datetime import datetime
-from fastapi import HTTPException
 
 logger = get_logger(__name__)
 
-
 router = APIRouter(prefix="/nasdaq", tags=["nasdaq"])
 
-utc_datetime = datetime.utcnow()
-# Set the desired timezone
-desired_timezone = pytz.timezone("America/New_York")
-# Convert the UTC time to the desired timezone
-localized_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(desired_timezone)
-midnight_time = datetime.combine(localized_datetime, datetime.min.time())
+# Constants
+CHUNK_SIZE = 65536
+COMPRESSION_LEVEL = 1
+MAX_DB_RETRIES = 3
+RETRY_DELAY = 1  # seconds
+HOLIDAY_URL = "https://www.nyse.com/markets/hours-calendars"
 
 
-db_params = {
-    "dbname": os.getenv("dbname"),
-    "user": os.getenv("user"),
-    "password": os.getenv("password"),
-    "host": os.getenv("host"),
-    "port": "5432",
-}
-
-db_pool = None
+# Pydantic models for request validation
+class NasdaqDataRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    start_datetime: str
 
 
-async def init_db_pool():
-    global db_pool
-    db_pool = await asyncpg.create_pool(
-        database=db_params["dbname"],
-        user=db_params["user"],
-        password=db_params["password"],
-        host=db_params["host"],
-        port=db_params["port"],
-        max_size=100,
-    )
+class DatabaseConfig:
+    def __init__(self):
+        self.config = {
+            "database": os.getenv("dbname"),
+            "user": os.getenv("user"),
+            "password": os.getenv("password"),
+            "host": os.getenv("host"),
+            "port": int(os.getenv("port", "5432")),
+            "min_size": 100,
+            "max_size": 500,
+        }
 
 
+class DatabaseManager:
+    def __init__(self):
+        self.config = DatabaseConfig()
+        self.pool: Optional[asyncpg.Pool] = None
+
+    async def init_pool(self) -> None:
+        """Initialize the database connection pool with retry logic"""
+        if self.pool is not None:
+            return
+
+        for attempt in range(MAX_DB_RETRIES):
+            try:
+                self.pool = await asyncpg.create_pool(**self.config.config)
+                logger.info("Database pool initialized successfully")
+                return
+            except Exception as e:
+                if attempt == MAX_DB_RETRIES - 1:
+                    logger.error(
+                        f"Failed to initialize database pool after {MAX_DB_RETRIES} attempts: {e}"
+                    )
+                    raise
+                logger.warning(
+                    f"Database pool initialization attempt {attempt + 1} failed: {e}"
+                )
+                await asyncio.sleep(RETRY_DELAY)
+
+    async def close_pool(self) -> None:
+        """Close the database connection pool"""
+        if self.pool:
+            await self.pool.close()
+            self.pool = None
+            logger.info("Database pool closed")
+
+    @asynccontextmanager
+    async def get_connection(self):
+        """Get a database connection from the pool with proper error handling"""
+        if not self.pool:
+            await self.init_pool()
+
+        try:
+            async with self.pool.acquire() as connection:
+                yield connection
+        except asyncpg.PostgresError as e:
+            logger.error(f"Database error: {e}")
+            raise HTTPException(status_code=503, detail="Database error occurred")
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+
+db_manager = DatabaseManager()
+
+
+# Startup and shutdown events
 @router.on_event("startup")
 async def startup_event():
-    await init_db_pool()
+    await db_manager.init_pool()
 
 
 @router.on_event("shutdown")
 async def shutdown_event():
-    await db_pool.close()
+    await db_manager.close_pool()
 
 
-HOLIDAY_URL = "https://www.nyse.com/markets/hours-calendars"
+# Utility functions
+def get_ny_datetime() -> datetime:
+    """Get current datetime in NY timezone"""
+    utc_datetime = datetime.utcnow()
+    ny_tz = pytz.timezone("America/New_York")
+    return utc_datetime.replace(tzinfo=pytz.utc).astimezone(ny_tz)
 
 
-def fetch_holidays():
-    try:
-        response = requests.get(HOLIDAY_URL)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching data: {e}")
-    # Parse the content using BeautifulSoup
-    soup = BeautifulSoup(response.content, "html.parser")
-    holidays = []
-    try:
-        # Locate the holiday table using the provided class name
-        holiday_table = soup.find(
-            "table", {"class": "table-data w-full table-fixed table-border-rows"}
-        )
-        if not holiday_table:
-            raise HTTPException(
-                status_code=500, detail="Holiday table not found on the page."
-            )
-        # Extract header and rows
-        headers = holiday_table.find("thead").find_all("td")
-        years = [
-            header.get_text(strip=True) for header in headers[1:]
-        ]  # Skip the first header, which is "Holiday"
-        rows = holiday_table.find("tbody").find_all("tr")
-        for row in rows:
-            columns = row.find_all("td")
-            holiday_name = columns[0].get_text(strip=True)
-            dates = [col.get_text(strip=True) for col in columns[1:]]
-            # Create a dictionary for each year with its corresponding holiday name and date
-            for year, date_str in zip(years, dates):
-                try:
-                    # Parse the date into a datetime object
-                    date_parts = date_str.split(",")
-                    month_day = (
-                        date_parts[1].strip().split("*")[0].split("(")[0]
-                    )  # Clean extra symbols like *, ()
-                    month, day = month_day.split(" ")
-                    # Construct the full date string
-                    full_date_str = f"{year} {month} {day.strip()}"
-                    date_time = datetime.strptime(full_date_str, "%Y %B %d")
-                    # Format the datetime object
-                    formatted_date_time = date_time.strftime("%Y-%m-%d")
-                except Exception:
-                    formatted_date_time = "Invalid Date Format"
-                holidays.append(
-                    {
-                        "year": year,
-                        "holiday_name": holiday_name,
-                        "date": date_str,
-                        "date_time": formatted_date_time,
-                    }
-                )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error parsing data: {e}")
-    return holidays
-
-
-@router.get("/holidays", response_model=list)
-def get_holidays():
-    holidays = fetch_holidays()
-    return holidays
-
-
-async def async_record_generator(records):
+async def stream_records(records: List[Dict[str, Any]]):
+    """Stream records with efficient JSON serialization"""
     for record in records:
-        record_dict = dict(record)
-        for key, value in record_dict.items():
-            if isinstance(value, datetime):
-                record_dict[key] = value.isoformat()
+        record_dict = {
+            k: v.isoformat() if isinstance(v, (datetime, date)) else v
+            for k, v in record.items()
+        }
         yield json.dumps(record_dict) + "\n"
 
 
-async def async_compressed_record_generator(
-    records, chunk_size=65536, compression_level=1
+async def compress_stream(
+    stream, chunk_size=CHUNK_SIZE, compression_level=COMPRESSION_LEVEL
 ):
+    """Compress the data stream efficiently"""
     buffer = io.BytesIO()
-    with gzip.GzipFile(fileobj=buffer, mode="w", compresslevel=compression_level) as f:
-        async for record in async_record_generator(records):
-            f.write(record.encode("utf-8"))
+    with gzip.GzipFile(fileobj=buffer, mode="w", compresslevel=compression_level) as gz:
+        async for chunk in stream:
+            gz.write(chunk.encode("utf-8"))
     buffer.seek(0)
     while chunk := buffer.read(chunk_size):
         yield chunk
@@ -161,74 +159,120 @@ def parse_date(date_string):
     return None  # Return None if no format matched
 
 
+# Enhanced route handlers
 @router.post("/get_data")
-async def get_nasdaq_data_by_date(request: Request):
+async def get_nasdaq_data_by_date(request: NasdaqDataRequest):
     start_time = time.time()
+    logger.info(f"Starting data fetch for symbol: {request.symbol}")
 
-    body = await request.json()
-    symbol = body.get("symbol")
-    start_datetime = body.get("start_datetime")
+    try:
+        # Parse date with improved exception handling
+        start_datetime = parse_date(request.start_datetime)
+        if start_datetime is None:
+            return Response(status_code=400, content="Invalid date format")
 
-    logger.info(
-        f"Starting get_nasdaq_data_by_date... - symbol {symbol} - start_datetime {start_datetime} "
-    )
-    # Parse date with improved exception handling
-    start_datetime = parse_date(start_datetime)
-    if start_datetime is None:
-        return Response(status_code=400, content="Invalid date format")
+        request.start_datetime = start_datetime
 
-    async with db_pool.acquire() as connection:
-        try:
-            fetch_start_time = time.time()
-            logger.info("Fetching data")
-            records = await fetch_all_data(connection, symbol, start_datetime)
-            fetch_end_time = time.time()
-            logger.info(
-                f"Data fetched in {fetch_end_time - fetch_start_time:.2f} seconds"
-            )
+        async with db_manager.get_connection() as conn:
+            records = await fetch_all_data(conn, request.symbol, request.start_datetime)
 
             if not records:
-                logger.info("No records found")
-                return Response(status_code=204)  # Return 204 No Content
+                return Response(status_code=204)
 
-            serialize_start_time = time.time()
-            logger.info(
-                f"Returning records - symbol {symbol} - start_datetime {start_datetime}"
-            )
-            chunk_size = 65536  # Adjust chunk size if necessary
-            compression_level = 1  # Lower compression level for faster compression
             response = StreamingResponse(
-                async_compressed_record_generator(
-                    records, chunk_size=chunk_size, compression_level=compression_level
-                ),
+                compress_stream(stream_records(records)),
                 media_type="application/json",
                 headers={"Content-Encoding": "gzip", "Transfer-Encoding": "chunked"},
             )
-            serialize_end_time = time.time()
-            logger.info(
-                f"Data serialized and compressed in {serialize_end_time - serialize_start_time:.2f} seconds - symbol {symbol} - start_datetime {start_datetime}"
-            )
 
-            return response
-        except Exception as e:
-            logger.error(
-                f"Error during data fetch or response preparation - symbol {symbol} - start_datetime {start_datetime}: {e}"
-            )
-            return Response(status_code=500, content="Server error")
-        finally:
-            end_time = time.time()
             logger.info(
-                f"Total time taken: {end_time - start_time:.2f} seconds - symbol {symbol} - start_datetime {start_datetime}"
+                f"Data fetch completed in {time.time() - start_time:.2f}s "
+                f"for symbol: {request.symbol}"
             )
+            return response
+
+    except Exception as e:
+        logger.error(f"Error processing request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/get_tickers")
 async def get_tickers():
-    records = await fetch_all_tickers()
-    return records
+    async with db_manager.get_connection() as conn:
+        return await fetch_all_tickers(conn)
 
 
-@router.get("/is_ticker_valid")
+@router.get("/is_ticker_valid/{ticker}")
 async def ticker_valid(ticker: str):
-    valid = await is_ticker_valid(ticker)
-    return valid
+    async with db_manager.get_connection() as conn:
+        return await is_ticker_valid(conn, ticker)
+
+
+@router.get("/holidays")
+async def get_holidays():
+    """Fetch NYSE holidays with caching"""
+    try:
+        response = requests.get(HOLIDAY_URL, timeout=10)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        holidays = parse_holiday_table(soup)
+
+        return holidays
+    except requests.RequestException as e:
+        logger.error(f"Error fetching holidays: {e}")
+        raise HTTPException(status_code=503, detail="Unable to fetch holiday data")
+
+
+def parse_holiday_table(soup: BeautifulSoup) -> List[Dict[str, str]]:
+    """Parse holiday table with better error handling"""
+    holidays = []
+    table = soup.find(
+        "table", {"class": "table-data w-full table-fixed table-border-rows"}
+    )
+
+    if not table:
+        raise HTTPException(status_code=500, detail="Holiday table not found")
+
+    try:
+        headers = [
+            h.get_text(strip=True) for h in table.find("thead").find_all("td")[1:]
+        ]
+        rows = table.find("tbody").find_all("tr")
+
+        for row in rows:
+            cols = row.find_all("td")
+            holiday_name = cols[0].get_text(strip=True)
+            dates = [col.get_text(strip=True) for col in cols[1:]]
+
+            for year, date_str in zip(headers, dates):
+                try:
+                    parsed_date = parse_holiday_date(date_str, year)
+                    holidays.append(
+                        {
+                            "year": year,
+                            "holiday_name": holiday_name,
+                            "date": date_str,
+                            "date_time": parsed_date.strftime("%Y-%m-%d")
+                            if parsed_date
+                            else None,
+                        }
+                    )
+                except ValueError as e:
+                    logger.warning(f"Error parsing date {date_str}: {e}")
+                    continue
+
+        return holidays
+    except Exception as e:
+        logger.error(f"Error parsing holiday table: {e}")
+        raise HTTPException(status_code=500, detail="Error parsing holiday data")
+
+
+def parse_holiday_date(date_str: str, year: str) -> Optional[datetime]:
+    """Parse holiday date with better error handling"""
+    try:
+        date_parts = date_str.split(",")[1].strip().split("*")[0].split("(")[0]
+        month, day = date_parts.strip().split(" ")
+        return datetime.strptime(f"{year} {month} {day.strip()}", "%Y %B %d")
+    except (ValueError, IndexError):
+        return None
