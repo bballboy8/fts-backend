@@ -2,7 +2,6 @@ import os
 import time
 from typing import Optional
 import dotenv
-import asyncpg
 import asyncio
 from datetime import datetime
 import pytz
@@ -93,18 +92,9 @@ async def fetch_all_data(
         logger.info(f"Total fetch_all_data time: {end_time - start_time:.2f} seconds")
 
 
-async def fetch_all_tickers():
-    conn = await asyncpg.connect(
-        database=db_params["dbname"],
-        user=db_params["user"],
-        password=db_params["password"],
-        host=db_params["host"],
-        port=db_params["port"],
-    )
-
+async def fetch_all_tickers(conn):
     # Base query
     query = "select * from mv_stock_data_symbol_count"
-
     logger.info(f"Executing query: {query}")
 
     try:
@@ -113,21 +103,10 @@ async def fetch_all_tickers():
     except Exception as e:
         logger.error(f"Error executing query: {e}", exc_info=True)
         raise
-    finally:
-        await conn.close()
-
     return records
 
 
-async def is_ticker_valid(ticker):
-    conn = await asyncpg.connect(
-        database=db_params["dbname"],
-        user=db_params["user"],
-        password=db_params["password"],
-        host=db_params["host"],
-        port=db_params["port"],
-    )
-
+async def is_ticker_valid(ticker, conn):
     # Base query
     query = (
         f"select symbol from stock_data_partitioned where symbol = '{ticker}' limit 1"
@@ -141,8 +120,6 @@ async def is_ticker_valid(ticker):
     except Exception as e:
         logger.error(f"Error executing query: {e}", exc_info=True)
         raise
-    finally:
-        await conn.close()
 
     return True if records else False
 
