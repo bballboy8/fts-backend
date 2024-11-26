@@ -236,3 +236,66 @@ async def ticker_valid(ticker: str):
     async with db_pool.acquire() as connection:
         valid = await is_ticker_valid(ticker, connection)
         return valid
+
+
+@router.post("/get_data_between_dates")
+async def get_nasdaq_data_between_dates(request: Request):
+    start_time = time.time()
+
+    body = await request.json()
+    symbol = body.get("symbol")
+    start_datetime = body.get("start_datetime")
+    end_datetime = body.get("end_datetime")
+
+    logger.info(
+        f"Starting get_nasdaq_data_by_date... - symbol {symbol} - start_datetime {start_datetime} - end_datetime {end_datetime}"
+    )
+    # Parse date with improved exception handling
+    start_datetime = parse_date(start_datetime)
+    end_datetime = parse_date(end_datetime)
+    if start_datetime is None or end_datetime is None:
+        return Response(status_code=400, content="Invalid date format")
+
+    async with db_pool.acquire() as connection:
+        try:
+            fetch_start_time = time.time()
+            logger.info("Fetching data")
+            records = await fetch_all_data(connection, symbol, start_datetime)
+            fetch_end_time = time.time()
+            logger.info(
+                f"Data fetched in {fetch_end_time - fetch_start_time:.2f} seconds"
+            )
+
+            if not records:
+                logger.info("No records found")
+                return Response(status_code=204)  # Return 204 No Content
+
+            serialize_start_time = time.time()
+            logger.info(
+                f"Returning records - symbol {symbol} - start_datetime {start_datetime}"
+            )
+            chunk_size = 65536  # Adjust chunk size if necessary
+            compression_level = 1  # Lower compression level for faster compression
+            response = StreamingResponse(
+                async_compressed_record_generator(
+                    records, chunk_size=chunk_size, compression_level=compression_level
+                ),
+                media_type="application/json",
+                headers={"Content-Encoding": "gzip", "Transfer-Encoding": "chunked"},
+            )
+            serialize_end_time = time.time()
+            logger.info(
+                f"Data serialized and compressed in {serialize_end_time - serialize_start_time:.2f} seconds - symbol {symbol} - start_datetime {start_datetime} - end_datetime {end_datetime}"
+            )
+
+            return response
+        except Exception as e:
+            logger.error(
+                f"Error during data fetch or response preparation - symbol {symbol} - start_datetime {start_datetime} - end_datetime {end_datetime}: {e}"
+            )
+            return Response(status_code=500, content="Server error")
+        finally:
+            end_time = time.time()
+            logger.info(
+                f"Total time taken: {end_time - start_time:.2f} seconds - symbol {symbol} - start_datetime {start_datetime} - end_datetime {end_datetime}"
+            )
