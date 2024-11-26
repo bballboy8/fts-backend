@@ -46,7 +46,8 @@ async def init_db_pool():
         password=db_params["password"],
         host=db_params["host"],
         port=db_params["port"],
-        max_size=100,
+        min_size=500,  # Number of connection the pool will be initialized with.
+        max_size=1000,  # Max number of connections in the pool.
     )
 
 
@@ -57,6 +58,7 @@ async def startup_event():
 
 @router.on_event("shutdown")
 async def shutdown_event():
+    global db_pool
     await db_pool.close()
 
 
@@ -224,11 +226,13 @@ async def get_nasdaq_data_by_date(request: Request):
 
 @router.get("/get_tickers")
 async def get_tickers():
-    records = await fetch_all_tickers()
-    return records
+    async with db_pool.acquire() as connection:
+        records = await fetch_all_tickers(connection)
+        return records
 
 
 @router.get("/is_ticker_valid")
 async def ticker_valid(ticker: str):
-    valid = await is_ticker_valid(ticker)
-    return valid
+    async with db_pool.acquire() as connection:
+        valid = await is_ticker_valid(ticker, connection)
+        return valid
