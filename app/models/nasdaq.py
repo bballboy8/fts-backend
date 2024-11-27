@@ -26,7 +26,7 @@ async def fetch_all_data(
     conn,
     symbol: Optional[str],
     start_datetime: Optional[datetime],
-    end_datetime: Optional[datetime]
+    end_datetime: Optional[datetime] = None
 ):
     start_time = time.time()
 
@@ -55,8 +55,9 @@ async def fetch_all_data(
         values.append(end_datetime)
 
     # Add condition to check that the date is <= current EST time
-    conditions.append(f"date <= ${len(values) + 1}::timestamp")
-    values.append(est_time)
+    else:
+        conditions.append(f"date <= ${len(values) + 1}::timestamp")
+        values.append(est_time)
 
     if conditions:
         query += " AND " + " AND ".join(conditions)
