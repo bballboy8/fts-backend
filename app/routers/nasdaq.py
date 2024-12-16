@@ -117,7 +117,9 @@ class WebSocketManager:
     async def connect(self, websocket: WebSocket):
         """connect event"""
         await websocket.accept()
-        self.active_connections.append({"isRunning": False, "socket": websocket})
+        self.active_connections.append(
+            {"isRunning": False, "socket": websocket, "symbols": []}
+        )
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         """Direct Message"""
@@ -133,6 +135,18 @@ class WebSocketManager:
         for idx, connection in enumerate(self.active_connections):
             if connection["socket"] == websocket:
                 self.active_connections[idx]["isRunning"] = False
+                break
+
+    def update_symbols(self, symbol: str, websocket: WebSocket):
+        for connection in self.active_connections:
+            if connection["socket"] == websocket:
+                action, sym = symbol.split(":", 1)
+                symbols = connection["symbols"]
+                if action == "Add" and sym not in symbols:
+                    symbols.append(sym)
+                elif action == "Remove" and sym in symbols:
+                    symbols.remove(sym)
+                print("All connections:", symbols)
                 break
 
     def disconnect(self, websocket: WebSocket):
@@ -157,10 +171,13 @@ async def websocket_endpoint_utp(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
+            print(f"Got Data: {data}")
             if data == "start":
                 manager_utp.startStream(websocket)
             elif data == "stop":
                 manager_utp.stopStream(websocket)
+            else:
+                manager_utp.update_symbols(symbol=data, websocket=websocket)
             await manager_utp.send_personal_message(f"Received:{data}", websocket)
     except WebSocketDisconnect:
         print("disconnected")
@@ -178,6 +195,8 @@ async def websocket_endpoint_cta(websocket: WebSocket):
                 manager_cta.startStream(websocket)
             elif data == "stop":
                 manager_cta.stopStream(websocket)
+            else:
+                manager_cta.update_symbols(symbol=data, websocket=websocket)
             await manager_cta.send_personal_message(f"Received:{data}", websocket)
     except WebSocketDisconnect:
         print("disconnected")
@@ -407,7 +426,19 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                 if connection["isRunning"]:
                     webSocket = connection["socket"]
                     try:
-                        await webSocket.send_json(response)
+                        if connection["symbols"]:
+                            temp_response = {
+                                "headers": response["headers"],
+                                "data": [
+                                    d
+                                    for d in response["data"]
+                                    if d[3] in connection["symbols"]
+                                ],
+                            }
+                            await webSocket.send_json(temp_response)
+                        else:
+                            await webSocket.send_json(response)
+
                     except Exception as e:
                         logger.error(
                             f"Total Connections: {len(manager.active_connections)}\nError occurred while sending data to client: {e}",
