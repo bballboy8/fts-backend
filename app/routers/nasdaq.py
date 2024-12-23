@@ -166,42 +166,47 @@ manager_cta = WebSocketManager()
 
 
 @router.websocket("/get_real_data_utp")
-async def websocket_endpoint_utp(websocket: WebSocket):
+async def websocket_endpoint_utp(websocket: WebSocket, symbol: Optional[str] = None):
+    # Connect WebSocket
     await manager_utp.connect(websocket)
+    if symbol:
+        manager_utp.update_symbols(f"Add:{symbol}", websocket)  # Register the symbol
+
     try:
         while True:
+            # Handle incoming WebSocket messages
             data = await websocket.receive_text()
-            print(f"Got Data: {data}")
             if data == "start":
                 manager_utp.startStream(websocket)
             elif data == "stop":
                 manager_utp.stopStream(websocket)
             else:
                 manager_utp.update_symbols(symbol=data, websocket=websocket)
-            await manager_utp.send_personal_message(f"Received:{data}", websocket)
+            await manager_utp.send_personal_message(f"Received: {data}", websocket)
     except WebSocketDisconnect:
-        print("disconnected")
         manager_utp.disconnect(websocket)
-        # await manager_utp.send_personal_message("Bye!!!", websocket)
 
 
 @router.websocket("/get_real_data_cta")
-async def websocket_endpoint_cta(websocket: WebSocket):
+async def websocket_endpoint_cta(websocket: WebSocket, symbol: Optional[str] = None):
+    # Connect WebSocket
     await manager_cta.connect(websocket)
+    if symbol:
+        manager_cta.update_symbols(f"Add:{symbol}", websocket)  # Register the symbol
+
     try:
         while True:
+            # Handle incoming WebSocket messages
             data = await websocket.receive_text()
             if data == "start":
                 manager_cta.startStream(websocket)
             elif data == "stop":
                 manager_cta.stopStream(websocket)
             else:
-                manager_cta.update_symbols(symbol=data, websocket=websocket)
-            await manager_cta.send_personal_message(f"Received:{data}", websocket)
+                manager_utp.update_symbols(symbol=data, websocket=websocket)
+            await manager_cta.send_personal_message(f"Received: {data}", websocket)
     except WebSocketDisconnect:
-        print("disconnected")
         manager_cta.disconnect(websocket)
-        # await manager_cta.send_personal_message("Bye!!!", websocket)
 
 
 @router.post("/get_data")
@@ -300,7 +305,9 @@ def convert_tracking_id_to_timestamp(tracking_id: str) -> datetime:
 
 
 def init_nasdaq_kafka_connection(topic):
-    print(os.getenv("NASDAQ_KAFKA_ENDPOINT"))
+    """
+    Initialize a Kafka connection without filtering symbols during setup.
+    """
     security_cfg = {
         "oauth.token.endpoint.uri": os.getenv("NASDAQ_KAFKA_ENDPOINT"),
         "oauth.client.id": os.getenv("NASDAQ_KAFKA_CLIENT_ID"),
@@ -312,26 +319,11 @@ def init_nasdaq_kafka_connection(topic):
         "socket.keepalive.enable": True,
     }
 
+    # Initialize NCDS client without symbol filtering
     ncds_client = NCDSClient(security_cfg, kafka_cfg)
-    consumer = ncds_client.ncds_kafka_consumer(topic)
-    logger.info(f"Success to connect NASDAQ Kafka server for topic {topic}.")
+    consumer = ncds_client.ncds_kafka_consumer(topic)  # Remove 'symbols'
+    logger.info(f"Connected to NASDAQ Kafka server for topic {topic}.")
     return consumer
-
-
-def is_market_open():
-    """Check if the market is open based on EST time."""
-    est = pytz.timezone("America/New_York")
-    now_est = datetime.now(est)
-
-    # Check if today is a weekend
-    if now_est.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
-        return False
-
-    # Market hours are from 4 AM to 8 PM EST
-    market_open_time = now_est.replace(hour=4, minute=0, second=0, microsecond=0)
-    market_close_time = now_est.replace(hour=20, minute=0, second=0, microsecond=0)
-    return True
-    return market_open_time <= now_est < market_close_time
 
 
 def generate_dummy_data():
@@ -400,53 +392,72 @@ def generate_dummy_data():
     }
 
 
+def is_market_open():
+    """Check if the market is open based on EST time."""
+    est = pytz.timezone("America/New_York")
+    now_est = datetime.now(est)
+
+    # Check if today is a weekend
+    if now_est.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
+        return False
+
+    # Market hours are from 4 AM to 8 PM EST
+    market_open_time = now_est.replace(hour=4, minute=0, second=0, microsecond=0)
+    market_close_time = now_est.replace(hour=20, minute=0, second=0, microsecond=0)
+    return market_open_time <= now_est < market_close_time
+
+
 async def listen_message_from_nasdaq_kafka(manager, topic):
     consumer = None
-    logger.info(f"Starting listening messages from nasdaq kafka for topic {topic}!")
+    logger.info(f"Starting listening messages from NASDAQ Kafka for topic {topic}.")
     while True:
         try:
             if send_dummy_data and not is_market_open():
-                if not any(
-                    connection["isRunning"] for connection in manager.active_connections
-                ):
+                if not any(conn["isRunning"] for conn in manager.active_connections):
                     time.sleep(0.5)
                     continue
                 time.sleep(0.5)
-                # Market is closed; send dummy data
+                # Generate and send dummy data
                 response = generate_dummy_data()
                 logger.info("Market closed. Sending dummy data.")
             else:
-                # Market is open; consume real data
+                # Market is open; initialize or fetch the Kafka consumer
                 if not consumer:
                     consumer = init_nasdaq_kafka_connection(topic)
-                    logger.info("Market open. Sending real data.")
-                messages = consumer.consume(num_messages=12500, timeout=0.25)
+
+                # Consume raw messages from Kafka
+                messages = consumer.consume(num_messages=50000, timeout=0.25)
                 response = makeRespFromKafkaMessages(messages)
+
+            # Filter data based on active symbols
             for idx, connection in enumerate(manager.active_connections):
                 if connection["isRunning"]:
                     webSocket = connection["socket"]
                     try:
+                        # Apply symbol filtering based on client's subscriptions
                         if connection["symbols"]:
+                            filtered_data = [
+                                d
+                                for d in response["data"]
+                                if d[3] in connection["symbols"]
+                            ]
                             temp_response = {
                                 "headers": response["headers"],
-                                "data": [
-                                    d
-                                    for d in response["data"]
-                                    if d[3] in connection["symbols"]
-                                ],
+                                "data": filtered_data,
                             }
                             await webSocket.send_json(temp_response)
                         else:
+                            # Send all data if no filters
                             await webSocket.send_json(response)
 
                     except Exception as e:
                         logger.error(
-                            f"Total Connections: {len(manager.active_connections)}\nError occurred while sending data to client: {e}",
+                            f"Error while sending data to client: {e}",
                             exc_info=True,
                         )
-                        logger.info(f"In except, this is the response: {response}")
+                        logger.info(f"Response: {response}")
         except Exception as e:
-            logger.error(f"Error in consuming: {e}", exc_info=True)
+            logger.error(f"Error in consumer loop: {e}", exc_info=True)
             consumer = None
 
 
