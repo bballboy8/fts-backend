@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 def seek_to_midnight_at_past_day(kafka_avro_consumer, topic_partition, num_days_ago=0, timeout=10):
     topic_partition.offset = get_timestamp_at_midnight(num_days_ago)
-    
     logger.debug(
         f"Num days ago: {num_days_ago}. Setting partition offset to timestamp: {topic_partition.offset}")
     try:
