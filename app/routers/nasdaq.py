@@ -166,7 +166,7 @@ manager_cta = WebSocketManager()
 
 
 @router.websocket("/get_real_data_utp")
-async def websocket_endpoint_utp(websocket: WebSocket):
+async def websocket_endpoint_utp(websocket: WebSocket, symbol: str = None):
     await manager_utp.connect(websocket)
     try:
         while True:
@@ -182,11 +182,10 @@ async def websocket_endpoint_utp(websocket: WebSocket):
     except WebSocketDisconnect:
         print("disconnected")
         manager_utp.disconnect(websocket)
-        # await manager_utp.send_personal_message("Bye!!!", websocket)
 
 
 @router.websocket("/get_real_data_cta")
-async def websocket_endpoint_cta(websocket: WebSocket):
+async def websocket_endpoint_cta(websocket: WebSocket, symbol: str = None):
     await manager_cta.connect(websocket)
     try:
         while True:
@@ -201,7 +200,6 @@ async def websocket_endpoint_cta(websocket: WebSocket):
     except WebSocketDisconnect:
         print("disconnected")
         manager_cta.disconnect(websocket)
-        # await manager_cta.send_personal_message("Bye!!!", websocket)
 
 
 @router.post("/get_data")
