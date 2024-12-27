@@ -26,7 +26,7 @@ async def fetch_all_data(
     conn,
     symbol: Optional[str],
     start_datetime: Optional[datetime],
-    end_datetime: Optional[datetime] = None
+    end_datetime: Optional[datetime] = None,
 ):
     start_time = time.time()
 
@@ -40,7 +40,7 @@ async def fetch_all_data(
     logger.info("Acquired connection from pool")
 
     # Base query
-    query = "SELECT date, symbol, size, price FROM stock_data_partitioned WHERE price>0 AND msgType in ('T', 'H')"
+    query = "SELECT date, symbol, size, price, msgtype FROM stock_data_partitioned WHERE msgType in ('T', 'H')"
     conditions = []
     values = []
 
