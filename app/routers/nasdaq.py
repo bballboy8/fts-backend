@@ -438,7 +438,10 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                             await webSocket.send_json(temp_response)
                         else:
                             await webSocket.send_json(response)
-
+                    except RuntimeError as re:
+                        if "Unexpected ASGI message" in str(re):
+                            # logger.warning(f"WebSocket already closed: {re}")
+                            pass
                     except Exception as e:
                         logger.error(
                             f"Total Connections: {len(manager.active_connections)}\nError occurred while sending data to client: {e}",
