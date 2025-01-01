@@ -419,9 +419,10 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                 # Market is open; consume real data
                 if not consumer:
                     consumer = init_nasdaq_kafka_connection(topic)
-                    logger.info("Market open. Sending real data.")
+                    logger.info("Market open. Listening for real data.")
                 messages = consumer.consume(num_messages=1000000, timeout=0.25)
                 if messages:
+                    logger.info(f"Received {len(messages)} messages from Kafka.")
                     response = makeRespFromKafkaMessages(messages)
                 else:
                     continue
@@ -439,16 +440,22 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                                 ],
                             }
                             if temp_response["data"]:
+                                logger.info(
+                                    f"Sending {len(temp_response['data'])} / {len(response['data'])} records to WebSocket connection for symbols {connection['symbols']}."
+                                )
                                 await webSocket.send_json(temp_response)
                         else:
+                            logger.info(
+                                f"Sending {len(response['data'])} records to WebSocket connection {idx}."
+                            )
                             await webSocket.send_json(response)
                     except RuntimeError as re:
                         if "Unexpected ASGI message" in str(re):
-                            # logger.warning(f"WebSocket already closed: {re}")
-                            pass
+                            pass  # WebSocket already closed
                     except Exception as e:
                         logger.error(
-                            f"Total Connections: {len(manager.active_connections)}\nError occurred while sending data to client: {e}",
+                            f"Total Connections: {len(manager.active_connections)}\n"
+                            f"Error occurred while sending data to client: {e}",
                             exc_info=True,
                         )
                         logger.info(f"In except, this is the response: {response}")
