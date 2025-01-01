@@ -421,7 +421,10 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                     consumer = init_nasdaq_kafka_connection(topic)
                     logger.info("Market open. Sending real data.")
                 messages = consumer.consume(num_messages=1000000, timeout=0.25)
-                response = makeRespFromKafkaMessages(messages)
+                if messages:
+                    response = makeRespFromKafkaMessages(messages)
+                else:
+                    continue
             for idx, connection in enumerate(manager.active_connections):
                 if connection["isRunning"]:
                     webSocket = connection["socket"]
@@ -435,7 +438,8 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                                     if d[3] in connection["symbols"]
                                 ],
                             }
-                            await webSocket.send_json(temp_response)
+                            if temp_response["data"]:
+                                await webSocket.send_json(temp_response)
                         else:
                             await webSocket.send_json(response)
                     except RuntimeError as re:
