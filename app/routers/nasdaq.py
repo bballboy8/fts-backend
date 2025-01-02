@@ -422,7 +422,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                     logger.info("Market open. Listening for real data.")
                 messages = consumer.consume(num_messages=1000000, timeout=0.25)
                 if messages:
-                    logger.info(f"Received {len(messages)} messages from Kafka.")
+                    logger.info(f"Received {len(messages)} messages from Kafka topic {topic}.")
                     response = makeRespFromKafkaMessages(messages)
                 else:
                     continue
@@ -441,7 +441,7 @@ async def listen_message_from_nasdaq_kafka(manager, topic):
                             }
                             if temp_response["data"]:
                                 logger.info(
-                                    f"Sending {len(temp_response['data'])} / {len(response['data'])} records to WebSocket connection for symbols {connection['symbols']}."
+                                    f"Sending {len(temp_response['data'])} / {len(response['data'])} records to WebSocket connection for symbols {connection['symbols']} from Kafka topic {topic}.."
                                 )
                                 await webSocket.send_json(temp_response)
                         else:
